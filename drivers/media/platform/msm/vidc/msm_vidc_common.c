@@ -1740,11 +1740,7 @@ static int msm_vidc_deinit_core(struct msm_vidc_inst *inst)
 		*/
 		schedule_delayed_work(&core->fw_unload_work,
 			msecs_to_jiffies(core->state == VIDC_CORE_INVALID ?
-					0 : msm_vidc_firmware_unload_delay));
-
-		dprintk(VIDC_DBG, "firmware unload delayed by %u ms\n",
-			core->state == VIDC_CORE_INVALID ?
-			0 : msm_vidc_firmware_unload_delay);
+					0 : 10000));
 	}
 
 core_already_uninited:
