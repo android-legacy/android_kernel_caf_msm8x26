@@ -16,15 +16,38 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#define PN547_MAGIC 0xE9
+#ifndef _LINUX_PN547_H
+#define _LINUX_PN547_H
+
+#define PN547_MAGIC	0xE9
 
 /*
  * PN544 power control via ioctl
  * PN544_SET_PWR(0): power off
  * PN544_SET_PWR(1): power on
- * PN544_SET_PWR(2): reset and power on with firmware download enabled
+ * PN544_SET_PWR(>1): power on with firmware download enabled
  */
-#define PN547_SET_PWR   _IOW(PN547_MAGIC, 0x01, unsigned int)
+#define PN547_SET_PWR	_IOW(PN547_MAGIC, 0x01, unsigned int)
 
-/* Still use the devices name "pn544" due to following libnfc original design*/
-//#define NFC_I2C_DEV_NAME        "pn544"
+struct pn547_i2c_platform_data {
+	void (*conf_gpio) (void);
+	int irq_gpio;
+	int ven_gpio;
+	int firm_gpio;
+#ifdef CONFIG_NFC_PN547_CLOCK_REQUEST
+	int clk_req_gpio;
+	int clk_req_irq;
+#endif
+#ifdef CONFIG_OF
+	u32 irq_gpio_flags;
+	u32 ven_gpio_flags;
+	u32 firm_gpio_flags;
+	u32 pvdd_en_gpio_flags;
+#endif
+	int pvdd_en_gpio;
+	int configure_gpio;
+	int configure_mpp;
+	bool dynamic_config;
+};
+
+#endif
