@@ -5204,6 +5204,12 @@ wpt_status WLANDXE_Stop
    }
 #endif
 
+   if(VOS_TIMER_STATE_STOPPED !=
+      wpalTimerGetCurStatus(&dxeCtxt->rxResourceAvailableTimer))
+   {
+      wpalTimerStop(&dxeCtxt->rxResourceAvailableTimer);
+   }
+
    HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_INFO_LOW,
             "%s Exit", __func__);
    return status;
@@ -5354,11 +5360,8 @@ void dxeTxThreadSetPowerStateEventHandler
 {
    wpt_msg                  *msgContent = (wpt_msg *)msgPtr;
    WLANDXE_CtrlBlkType      *dxeCtxt;
-   wpt_status                status = eWLAN_PAL_STATUS_SUCCESS;
+   wpt_status                status = eWLAN_PAL_STATUS_E_FAILURE;
    WLANDXE_PowerStateType    reqPowerState;
-   wpt_int8                  i;
-   WLANDXE_ChannelCBType     *channelEntry;
-   wpt_log_data_stall_channel_type channelLog;
 
    HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_INFO_LOW,
             "%s Enter", __func__);
@@ -5386,33 +5389,7 @@ void dxeTxThreadSetPowerStateEventHandler
       case WLANDXE_POWER_STATE_IMPS:
          if(WLANDXE_RIVA_POWER_STATE_ACTIVE == dxeCtxt->rivaPowerState)
          {
-
-            for(i = WDTS_CHANNEL_TX_LOW_PRI; i < WDTS_CHANNEL_RX_LOW_PRI; i++)
-            {
-               channelEntry = &dxeCtxt->dxeChannel[i];
-               if(channelEntry->tailCtrlBlk != channelEntry->headCtrlBlk)
-               {
-                  status = eWLAN_PAL_STATUS_E_FAILURE;
-                  HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_INFO_LOW,
-                           "%11s : %s :TX Pending frame",
-                           channelType[channelEntry->channelType], __func__);
-
-                  dxeChannelMonitor("DXE_IMP_ERR", channelEntry, &channelLog);
-                  dxeDescriptorDump(channelEntry,
-                                    channelEntry->headCtrlBlk->linkedDesc, 0);
-                  dxeChannelRegisterDump(channelEntry, "DXE_IMPS_ERR",
-                                         &channelLog);
-                  dxeChannelAllDescDump(channelEntry,
-                                        channelEntry->channelType,
-                                        &channelLog);
-               }
-            }
-
-            if (eWLAN_PAL_STATUS_SUCCESS == status)
-            {
-               dxeCtxt->rivaPowerState = WLANDXE_RIVA_POWER_STATE_IMPS_UNKNOWN;
-               dxeCtxt->hostPowerState = WLANDXE_POWER_STATE_IMPS;
-            }
+            dxeCtxt->rivaPowerState = WLANDXE_RIVA_POWER_STATE_IMPS_UNKNOWN;
          }
          else
          {
@@ -5563,6 +5540,7 @@ wpt_status WLANDXE_SetPowerState
          hostPowerState = WLANDXE_POWER_STATE_BMPS;
          break;
       case WDTS_POWER_STATE_IMPS:
+         pDxeCtrlBlk->hostPowerState = WLANDXE_POWER_STATE_IMPS;
          hostPowerState = WLANDXE_POWER_STATE_IMPS;
          break;
       case WDTS_POWER_STATE_DOWN:
@@ -5655,10 +5633,6 @@ wpt_status WLANDXE_SetPowerState
       {
          pDxeCtrlBlk->hostPowerState = hostPowerState;
          pDxeCtrlBlk->rivaPowerState = WLANDXE_RIVA_POWER_STATE_BMPS_UNKNOWN;
-      }
-      else if ( hostPowerState == WLANDXE_POWER_STATE_IMPS )
-      {
-         pDxeCtrlBlk->hostPowerState = WLANDXE_POWER_STATE_IMPS;
       }
       else
       {
