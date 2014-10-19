@@ -437,13 +437,6 @@ typedef enum
    WLAN_HAL_IP_FORWARD_TABLE_UPDATE_IND     = 232,
 
    WLAN_HAL_AVOID_FREQ_RANGE_IND            = 233,
-
-   /* print register values */
-   WLAN_HAL_PRINT_REG_INFO_IND              = 259, /* Assigned same value that of Master one */
-
-   WLAN_HAL_GET_BCN_MISS_RATE_REQ           = 260,
-   WLAN_HAL_GET_BCN_MISS_RATE_RSP           = 261,
-
   WLAN_HAL_MSG_MAX = WLAN_HAL_MSG_TYPE_MAX_ENUM_SIZE
 }tHalHostMsgType;
 
@@ -6117,7 +6110,6 @@ typedef enum {
     WLAN_PERIODIC_TX_PTRN  = 28,
     ADVANCE_TDLS           = 29,
     BATCH_SCAN             = 30,
-    FW_IN_TX_PATH          = 31,
     EXTENDED_NSOFFLOAD_SLOT = 32,
     UPDATE_CHANNEL_LIST    = 35,
     MAX_FEATURE_SUPPORTED  = 128,
@@ -6995,47 +6987,6 @@ typedef PACKED_PRE struct PACKED_POST
 #elif defined(__ANI_COMPILER_PRAGMA_PACK)
 #else
 #endif
-
-/*---------------------------------------------------------------------------
- * WLAN_HAL_PRINT_REG_INFO_IND
- *--------------------------------------------------------------------------*/
-
-typedef PACKED_PRE struct PACKED_POST
-{
-   uint32 regAddr;
-   uint32 regValue;
-} tHalRegDebugInfo, *tpRegDebugInfo;
-
-typedef PACKED_PRE struct PACKED_POST
-{
-   uint32 regCount;
-   uint32 scenario;
-   uint32 reasonCode;
-} tHalRegDebugInfoParams, *tpRegDebugInfoParams;
-
-typedef PACKED_PRE struct PACKED_POST
-{
-   tHalMsgHeader header;
-   tHalRegDebugInfoParams regParams;
-} tHalRegDebugInfoMsg, *tpRegDebugInfoMsg;
-
-/*---------------------------------------------------------------------------
- * WLAN_HAL_GET_BCN_MISS_RATE_REQ
- *--------------------------------------------------------------------------*/
-typedef PACKED_PRE struct PACKED_POST
-{
-   /* Valid STA Idx for per STA stats request */
-   tANI_U8    bssIdx;
-}tHalBcnMissRateReqParams, *tpHalBcnMissRateReqParams;
-
-/*---------------------------------------------------------------------------
- * WLAN_HAL_GET_BCN_MISS_RATE_RSP
- *--------------------------------------------------------------------------*/
-typedef PACKED_PRE struct PACKED_POST
-{
-   tANI_U32           status;
-   tANI_U32           bcnMissCnt;
-}tHalBcnMissRateRspParams, *tpHalBcnMissRateRspParams;
 
 #endif /* _WLAN_HAL_MSG_H_ */
 
