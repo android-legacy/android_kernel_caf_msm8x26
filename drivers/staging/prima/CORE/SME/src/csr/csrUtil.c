@@ -3134,7 +3134,7 @@ eHalStatus csrValidateMCCBeaconInterval(tpAniSirGlobal pMac, tANI_U8 channelId,
                 break;
 
                 default :
-                    smsLog(pMac, LOGE, FL(" Persona not supported : %d"),currBssPersona);
+                    smsLog(pMac, LOG1, FL(" Persona not supported : %d"),currBssPersona);
                     return eHAL_STATUS_FAILURE;
             }
         }
@@ -5833,10 +5833,11 @@ void csrReleaseProfile(tpAniSirGlobal pMac, tCsrRoamProfile *pProfile)
             pProfile->pWAPIReqIE = NULL;
         }
 #endif /* FEATURE_WLAN_WAPI */
-        if (pProfile->nAddIEScanLength)
+
+        if(pProfile->pAddIEScan)
         {
-           memset(pProfile->addIEScan, 0 , SIR_MAC_MAX_IE_LENGTH+2);
-           pProfile->nAddIEScanLength = 0;
+            palFreeMemory(pMac->hHdd, pProfile->pAddIEScan);
+            pProfile->pAddIEScan = NULL;
         }
 
         if(pProfile->pAddIEAssoc)
@@ -6157,7 +6158,7 @@ v_CountryInfoSource_t source
         }
         else
         {
-            smsLog(pMac, LOGW, FL(" Couldn't find domain for country code  %c%c"), pCountry[0], pCountry[1]);
+            smsLog(pMac, LOGW, FL("  doesn't match country %c%c"), pCountry[0], pCountry[1]);
             status = eHAL_STATUS_INVALID_PARAMETER;
         }
     }
