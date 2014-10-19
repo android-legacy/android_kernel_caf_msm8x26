@@ -1,10 +1,4 @@
-# We can build either as part of a standalone Kernel build or part
-# of an Android build.  Determine which mechanism is being used
-ifeq ($(MODNAME),)
-	KERNEL_BUILD := 1
-else
-	KERNEL_BUILD := 0
-endif
+KERNEL_BUILD := 1
 
 ifeq ($(KERNEL_BUILD),1)
 	# These are provided in Android-based builds
@@ -58,7 +52,7 @@ BUILD_DEBUG_VERSION := 1
 BUILD_DIAG_VERSION := 1
 
 #Do we panic on bug?  default is to warn
-PANIC_ON_BUG := 1
+PANIC_ON_BUG := 0
 
 #Re-enable wifi on WDI timeout
 RE_ENABLE_WIFI_ON_WDI_TIMEOUT := 0
@@ -538,10 +532,7 @@ CDEFINES :=	-DANI_BUS_TYPE_PLATFORM=1 \
 		-DWLAN_WAKEUP_EVENTS \
 	        -DWLAN_KD_READY_NOTIFIER \
 		-DFEATURE_WLAN_BATCH_SCAN \
-		-DFEATURE_WLAN_LPHB \
-		-DFEATURE_WLAN_CH144 \
-                -DWLAN_BUG_ON_SKB_ERROR \
-                -DWLAN_DXE_LOW_RESOURCE_TIMER
+		-DFEATURE_WLAN_LPHB
 
 ifneq ($(CONFIG_PRONTO_WLAN),)
 CDEFINES += -DWCN_PRONTO
@@ -641,8 +632,6 @@ endif
 ifeq ($(CONFIG_ENABLE_LINUX_REG), y)
 CDEFINES += -DCONFIG_ENABLE_LINUX_REG
 endif
-
-CDEFINES += -DFEATURE_WLAN_CH_AVOID
 
 # Fix build for GCC 4.7
 EXTRA_CFLAGS += -Wno-maybe-uninitialized -Wno-unused-function

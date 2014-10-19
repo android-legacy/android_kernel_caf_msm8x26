@@ -56,6 +56,9 @@
   Are listed for each API below.
 
 
+  Copyright (c) 2008 QUALCOMM Incorporated.
+  All Rights Reserved.
+  Qualcomm Confidential and Proprietary
 ===========================================================================*/
 
 /*===========================================================================
@@ -1049,7 +1052,7 @@ void WLANTL_AssocFailed(v_U8_t staId)
   if(!VOS_IS_STATUS_SUCCESS(WLANTL_StartForwarding(staId,0,0)))
   {
     VOS_TRACE(VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_ERROR,
-       " %s fails to start forwarding (staId %d)", __func__, staId);
+       " %s fails to start forwarding", __func__);
   }
 }
   
@@ -1495,8 +1498,6 @@ WLANTL_ClearSTAClient
   {
     TLLOGE(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_ERROR,
     "WLAN TL:Station was not previously registered on WLANTL_ClearSTAClient"));
-    /* Clean packets cached for the STA */
-    WLANTL_StartForwarding(ucSTAId,0,0);
     return VOS_STATUS_E_EXISTS;
   }
 
@@ -3158,7 +3159,7 @@ WLANTL_TxMgmtFrm
   v_U8_t               ucTid,
   WLANTL_TxCompCBType  pfnCompTxFunc,
   v_PVOID_t            pvBDHeader,
-  v_U32_t              ucAckResponse
+  v_U8_t               ucAckResponse
 )
 {
   WLANTL_CbType*  pTLCb = NULL;
@@ -4726,28 +4727,12 @@ WLANTL_CacheSTAFrame
     {
       /*this is the first frame that we are caching */
       pClientSTA->vosBegCachedFrame = vosTempBuff;
-
-      pClientSTA->tlCacheInfo.cacheInitTime = vos_timer_get_system_time();
-      pClientSTA->tlCacheInfo.cacheDoneTime =
-              pClientSTA->tlCacheInfo.cacheInitTime;
-      pClientSTA->tlCacheInfo.cacheSize = 1;
-
     }
     else
     {
       /*this is a subsequent frame that we are caching: chain to the end */
       vos_pkt_chain_packet(pClientSTA->vosEndCachedFrame,
                            vosTempBuff, VOS_TRUE);
-
-      pClientSTA->tlCacheInfo.cacheDoneTime = vos_timer_get_system_time();
-      pClientSTA->tlCacheInfo.cacheSize ++;
-
-      if (pClientSTA->tlCacheInfo.cacheSize % WLANTL_CACHE_TRACE_WATERMARK == 0)
-      {
-        VOS_TRACE(VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_ERROR,
-                  "%s: Cache High watermark for staid:%d (%d)",
-                  __func__,ucSTAId, pClientSTA->tlCacheInfo.cacheSize);
-      }
     }
     pClientSTA->vosEndCachedFrame = vosTempBuff;
   }/*else new packet*/
@@ -4937,8 +4922,6 @@ done:
    -------------------------------------------------------------------------*/
   pClientSTA->vosBegCachedFrame = NULL;
   pClientSTA->vosEndCachedFrame = NULL;
-  pClientSTA->tlCacheInfo.cacheSize = 0;
-  pClientSTA->tlCacheInfo.cacheClearTime = vos_timer_get_system_time();
 
     /*-----------------------------------------------------------------------
     After all the init is complete we can mark the existance flag 
@@ -6072,6 +6055,7 @@ WLANTL_RxCachedFrames
     -------------------------------------------------------------------------*/
     pClientSTA = pTLCb->atlSTAClients[ucSTAId];
 
+
     if ( NULL == pClientSTA )
     {
       TLLOGE(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_ERROR,
@@ -6678,7 +6662,7 @@ WLANTL_STATxConn
    v_U8_t               extraHeadSpace = 0;
    v_U8_t               ucWDSEnabled = 0;
    v_U8_t               ucAC, ucACMask, i; 
-   v_U32_t              txFlag = HAL_TX_NO_ENCRYPTION_MASK;
+   v_U8_t               txFlag = HAL_TX_NO_ENCRYPTION_MASK;
   /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
   /*------------------------------------------------------------------------
@@ -7054,7 +7038,7 @@ WLANTL_STATxAuth
    v_U8_t                extraHeadSpace = 0;
    WLANTL_STAClientType *pStaClient = NULL;
    v_U8_t                ucWDSEnabled = 0;
-   v_U32_t               ucTxFlag   = 0;
+   v_U8_t                ucTxFlag   = 0; 
    v_U8_t                ucACMask, i; 
   /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
@@ -7376,12 +7360,6 @@ WLANTL_STATxAuth
     ucTxFlag = ucTxFlag | HAL_TDLS_PEER_STA_MASK;
   }
 #endif /* FEATURE_WLAN_TDLS */
-  if( tlMetaInfo.ucIsArp )
-  {
-    /*Send ARP at lowest Phy rate and through WQ5 */
-    ucTxFlag |= HAL_USE_BD_RATE_MASK;
-    ucTxFlag |= HAL_USE_FW_IN_TX_PATH;
-  }
 
   vosStatus = (VOS_STATUS)WDA_DS_BuildTxPacketInfo( pvosGCtx, 
                      vosDataBuff , &vDestMacAddr,
@@ -7700,7 +7678,7 @@ WLANTL_STARxConn
 
         if ( VOS_STATUS_SUCCESS != vosStatus ) 
         {
-          TLLOGE(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_WARN,
+          TLLOGE(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_ERROR,
             "WLAN TL:Failed to translate from 802.11 to 802.3 - dropping"));
           /* Drop packet */
           vos_pkt_return_packet(vosDataBuff);
@@ -8161,7 +8139,7 @@ WLANTL_STARxAuth
 
       if ( VOS_STATUS_SUCCESS != vosStatus )
       {
-        TLLOGE(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_WARN,
+        TLLOGE(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_ERROR,
                "WLAN TL:Failed to translate from 802.11 to 802.3 - dropping"));
         /* Drop packet */
         vos_pkt_return_packet(vosDataBuff);
@@ -9614,7 +9592,7 @@ WLANTL_Translate80211To8023Header
 
     if ( VOS_STATUS_SUCCESS != vosStatus )
     {
-       TLLOGE(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_WARN,
+       TLLOGE(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_ERROR,
                   "WLAN TL: Failed to pop LLC header from packet %d",
                   vosStatus));
 

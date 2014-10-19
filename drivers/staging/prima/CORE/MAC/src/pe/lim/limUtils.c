@@ -1745,13 +1745,27 @@ limIsNullSsid( tSirMacSSid *pSsid )
         }
 
 #define ASCII_SPACE_CHARACTER 0x20
-        /* If the first charactes is space and SSID length is 1
-         * then consider it as NULL SSID*/
-        if ((ASCII_SPACE_CHARACTER == pSsid->ssId[0]) &&
-            (pSsid->length == 1))
+        /* If the first charactes is space, then check if all characters in 
+         * SSID are spaces to consider it as NULL SSID*/
+        if( ASCII_SPACE_CHARACTER == pSsid->ssId[0])
         {
-             fNullSsid = true;
-             break;
+            SsidLength = pSsid->length;
+            pSsidStr = pSsid->ssId;
+            /* check if all the charactes in SSID are spaces*/
+            while ( SsidLength )
+            {
+                if( ASCII_SPACE_CHARACTER != *pSsidStr )
+                    break;
+    
+                pSsidStr++;
+                SsidLength--;
+            }
+    
+            if( 0 == SsidLength )
+            {
+                fNullSsid = true;
+                break;
+            }
         }
         else
         {
@@ -5084,6 +5098,7 @@ void limTxComplete( tHalHandle hHal, void *pData )
         if(VOS_IS_STATUS_SUCCESS(vosStatus))
         {
             mHdr = WDA_GET_RX_MAC_HEADER(pRxBd);
+            MTRACE(macTrace(pMac, TRACE_CODE_TX_COMPLETE, NO_SESSION, mHdr->fc.subType);)
 
         }   
     }

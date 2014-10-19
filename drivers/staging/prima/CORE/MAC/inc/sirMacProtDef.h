@@ -176,20 +176,17 @@
 #define SIR_MAC_ACTION_DLP             2
 #define SIR_MAC_ACTION_BLKACK          3
 #define SIR_MAC_ACTION_PUBLIC_USAGE    4
+#if defined WLAN_FEATURE_VOWIFI
 #define SIR_MAC_ACTION_RRM             5
-#define SIR_MAC_ACTION_FAST_BSS_TRNST  6
+#endif
 #define SIR_MAC_ACTION_HT              7
-#define SIR_MAC_ACTION_SA_QUERY        8
-#define SIR_MAC_ACTION_PROT_DUAL_PUB   9
-#define SIR_MAC_ACTION_WNM            10
-#define SIR_MAC_ACTION_UNPROT_WNM     11
+#ifdef FEATURE_WLAN_TDLS
 #define SIR_MAC_ACTION_TDLS           12
-#define SIR_MAC_ACITON_MESH           13
-#define SIR_MAC_ACTION_MULTIHOP       14
-#define SIR_MAC_SELF_PROTECTED        15
+#endif
 #define SIR_MAC_ACTION_WME            17
+#ifdef WLAN_FEATURE_11AC
 #define SIR_MAC_ACTION_VHT            21
-
+#endif
 
 // QoS management action codes
 
@@ -265,6 +262,7 @@
 
 #ifdef WLAN_FEATURE_11W
 //11w SA query request/response action frame category code
+#define SIR_MAC_ACTION_SA_QUERY          8
 #define SIR_MAC_SA_QUERY_REQ             0
 #define SIR_MAC_SA_QUERY_RSP             1
 #endif

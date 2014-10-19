@@ -1094,7 +1094,6 @@ VOS_STATUS vos_nv_open(void)
     v_BOOL_t itemIsValid = VOS_FALSE;
     v_U32_t dataOffset;
     sHalNv *pnvData = NULL;
-    hdd_context_t *pHddCtx = NULL;
 
     /*Get the global context */
     pVosContext = vos_get_global_context(VOS_MODULE_ID_SYS, NULL);
@@ -1267,8 +1266,8 @@ VOS_STATUS vos_nv_open(void)
     }
 
     VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-        "INFO: NV version = %d is loaded, driver supports NV version = %d",
-        gnvEFSTable->halnv.fields.nvVersion, WLAN_NV_VERSION);
+           "INFO: NV binary file version=%d Driver default NV version=%d, continue...\n",
+           gnvEFSTable->halnv.fields.nvVersion, WLAN_NV_VERSION);
 
      /* Copying the read nv data to the globa NV EFS table */
     {
@@ -1279,23 +1278,23 @@ VOS_STATUS vos_nv_open(void)
                (gnvEFSTable->halnv.fields.nvVersion == NV_VERSION_11N_11AC_COUPER_TYPE))
            {
                VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-                   "INFO: Using Coupler Type field instead of FW Config table, "
-                   "make sure that this is intended or may impact performance.");
+                     "!!!WARNING: Using Coupler Type field instead of Fw Config table,\n"
+                     "Make sure that this is intented or may impact performance!!!\n");
            }
 #ifdef FEATURE_WLAN_CH144
            else if ((WLAN_NV_VERSION == NV_VERSION_CH144_CONFIG) &&
                     (((VosContextType*)(pVosContext))->nvVersion == E_NV_V2))
            {
                VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-                   "INFO: Driver supports NV3 CH144 by default, "
-                   "NV2 is currently loaded, NV2 will be used.");
+                     "!!!WARNING: Default NV is NV3 CH144 "
+                     "BIN is NV2, NV2 contents will be used!!!");
            }
 #endif /* FEATURE_WLAN_CH144 */
            else
            {
                VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-                   "INFO: NV loaded doesn't match with driver default NV, "
-                   "driver default NV will be used, may impact performance.");
+                     "!!!WARNING: NV binary file version doesn't match with Driver default NV version\n"
+                     "Driver NV defaults will be used, may impact performance!!!\n");
 
                return VOS_STATUS_SUCCESS;
            }
@@ -1348,22 +1347,6 @@ VOS_STATUS vos_nv_open(void)
                 (v_VOID_t *)&pnvEFSTable->halnv.tables.defaultCountryTable,
                 NULL, sizeof(sDefaultCountry) ) !=  VOS_STATUS_SUCCESS)
                     goto error;
-            }
-            pHddCtx = vos_get_context(VOS_MODULE_ID_HDD, pVosContext);
-            if (NULL != pHddCtx)
-            {
-               if (!vos_mem_compare(pHddCtx->cfg_ini->overrideCountryCode,
-                     CFG_OVERRIDE_COUNTRY_CODE_DEFAULT, 3))
-               {
-                   vos_mem_copy(pnvEFSTable->halnv.tables.defaultCountryTable.countryCode,
-                       pHddCtx->cfg_ini->overrideCountryCode,
-                       3);
-               }
-            }
-            else
-            {
-                VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-                           ("Invalid pHddCtx pointer") );
             }
         }
 
@@ -3555,10 +3538,10 @@ int wlan_hdd_linux_reg_notifier(struct wiphy *wiphy,
 #endif
     }
 
-    if (WLAN_HDD_IS_UNLOAD_IN_PROGRESS(pHddCtx))
+    if (pHddCtx->isLoadUnloadInProgress)
     {
-       VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-                   ("%s Unload is in progress"), __func__ );
+        wiphy_dbg(wiphy, "info: %s: Unloading/Loading in Progress. Ignore!!!",
+                  __func__);
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
         return;
 #else
@@ -3699,8 +3682,6 @@ VOS_STATUS vos_init_wiphy_from_nv_bin(void)
         reg_domain = pnvEFSTable->halnv.tables.defaultCountryTable.regDomain;
         wiphy->flags |= WIPHY_FLAG_STRICT_REGULATORY;
     }
-
-    temp_reg_domain = cur_reg_domain = reg_domain;
 
     m = 0;
     for (i = 0; i < IEEE80211_NUM_BANDS; i++)
@@ -3976,7 +3957,7 @@ int wlan_hdd_crda_reg_notifier(struct wiphy *wiphy,
        return 0;
 #endif
     }
-    if((WLAN_HDD_IS_UNLOAD_IN_PROGRESS(pHddCtx)) ||
+    if(pHddCtx->isLoadUnloadInProgress ||
         pHddCtx->isLogpInProgress)
     {
         VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
@@ -3992,8 +3973,6 @@ int wlan_hdd_crda_reg_notifier(struct wiphy *wiphy,
     {
        int status;
        wiphy_dbg(wiphy, "info: set by user\n");
-       memset(ccode, 0, WNI_CFG_COUNTRY_CODE_LEN);
-       memcpy(ccode, request->alpha2, 2);
        init_completion(&change_country_code);
        /* We will process hints by user from nl80211 in driver.
        * sme_ChangeCountryCode will set the country to driver
@@ -4009,7 +3988,7 @@ int wlan_hdd_crda_reg_notifier(struct wiphy *wiphy,
        status = sme_ChangeCountryCode(pHddCtx->hHal,
                                    (void *)(tSmeChangeCountryCallback)
                                    vos_nv_change_country_code_cb,
-                                   ccode,
+                                   request->alpha2,
                                    &change_country_code,
                                    pHddCtx->pvosContext,
                                    eSIR_FALSE,

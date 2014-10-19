@@ -262,7 +262,6 @@ extern spinlock_t hdd_context_lock;
 #define RSSI_CONTEXT_MAGIC  0x52535349   //RSSI
 #define POWER_CONTEXT_MAGIC 0x504F5752   //POWR
 #define SNR_CONTEXT_MAGIC   0x534E5200   //SNR
-#define BCN_MISS_RATE_CONTEXT_MAGIC 0x513F5753
 
 #ifdef FEATURE_WLAN_BATCH_SCAN
 #define HDD_BATCH_SCAN_VERSION (17)
@@ -533,13 +532,6 @@ typedef enum
    WLAN_HDD_TM_LEVEL_4,
    WLAN_HDD_TM_LEVEL_MAX
 } WLAN_TmLevelEnumType;
-
-typedef enum
-{
-   WLAN_HDD_NO_LOAD_UNLOAD_IN_PROGRESS = 0 ,
-   WLAN_HDD_LOAD_IN_PROGRESS           = 1<<0,
-   WLAN_HDD_UNLOAD_IN_PROGRESS         = 1<<1,
-}load_unload_sequence;
 
 /* Driver Action based on thermal mitigation level structure */
 typedef struct
@@ -1081,12 +1073,6 @@ typedef struct
 } lphbEnableStruct;
 #endif /* FEATURE_WLAN_LPHB */
 
-typedef struct
-{
-   struct completion completion;
-   tANI_U32 magic;
-}bcnMissRateContext_t;
-
 /** Adapter stucture definition */
 
 struct hdd_context_s
@@ -1163,7 +1149,7 @@ struct hdd_context_s
 
    struct completion ssr_comp_var;
 
-   v_U8_t isLoadUnloadInProgress;
+   v_BOOL_t isLoadUnloadInProgress;
    
    /**Track whether driver has been suspended.*/
    hdd_ps_state_t hdd_ps_state;
@@ -1243,8 +1229,6 @@ struct hdd_context_s
     /* TDLS peer connected count */
     tANI_U16 connected_peer_count;
     tdls_scan_context_t tdls_scan_ctxt;
-   /* Lock to avoid race condition during TDLS operations*/
-   struct mutex tdls_lock;
 #endif
 
     hdd_traffic_monitor_t traffic_monitor;
@@ -1295,15 +1279,7 @@ struct hdd_context_s
 };
 
 
-#define WLAN_HDD_IS_LOAD_IN_PROGRESS(pHddCtx)  \
-            (pHddCtx->isLoadUnloadInProgress & WLAN_HDD_LOAD_IN_PROGRESS)
 
-#define WLAN_HDD_IS_UNLOAD_IN_PROGRESS(pHddCtx)  \
-            (pHddCtx->isLoadUnloadInProgress & WLAN_HDD_UNLOAD_IN_PROGRESS)
-
-#define WLAN_HDD_IS_LOAD_UNLOAD_IN_PROGRESS(pHddCtx)  \
-            (pHddCtx->isLoadUnloadInProgress &    \
-              (WLAN_HDD_LOAD_IN_PROGRESS | WLAN_HDD_UNLOAD_IN_PROGRESS))
 /*--------------------------------------------------------------------------- 
   Function declarations and documenation
   -------------------------------------------------------------------------*/ 
@@ -1354,7 +1330,7 @@ tVOS_CON_MODE hdd_get_conparam( void );
 void wlan_hdd_enable_deepsleep(v_VOID_t * pVosContext);
 v_BOOL_t hdd_is_apps_power_collapse_allowed(hdd_context_t* pHddCtx);
 v_BOOL_t hdd_is_suspend_notify_allowed(hdd_context_t* pHddCtx);
-void hdd_abort_mac_scan(hdd_context_t *pHddCtx, eCsrAbortReason reason);
+void hdd_abort_mac_scan(hdd_context_t *pHddCtx);
 void wlan_hdd_set_monitor_tx_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter );
 void hdd_cleanup_actionframe( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter );
 
