@@ -40,14 +40,7 @@ else
        DLKM_DIR := build/dlkm
 endif
 
-# Copy WCNSS_cfg.dat file from firmware_bin/ folder to target out directory.
-ifeq ($(WLAN_PROPRIETARY),0)
-
-$(shell rm -f $(TARGET_OUT_ETC)/firmware/wlan/prima/WCNSS_cfg.dat)
-$(shell cp $(LOCAL_PATH)/firmware_bin/WCNSS_cfg.dat $(TARGET_OUT_ETC)/firmware/wlan/prima)
-
-else
-
+ifeq ($(WLAN_PROPRIETARY),1)
 # For the proprietary driver the firmware files are handled here
 include $(CLEAR_VARS)
 LOCAL_MODULE       := WCNSS_qcom_wlan_nv.bin
