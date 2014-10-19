@@ -31,6 +31,10 @@
 
 #include "sdhci.h"
 
+#ifdef CONFIG_SONY_EAGLE
+#include <mach/cci_hw_id.h>
+#endif
+
 #define DRIVER_NAME "sdhci"
 #define SDHCI_SUSPEND_TIMEOUT 300 /* 300 ms */
 
@@ -3288,7 +3292,42 @@ int sdhci_add_host(struct sdhci_host *host)
 	 * Set host parameters.
 	 */
 	mmc->ops = &sdhci_ops;
+
+#ifndef CONFIG_SONY_EAGLE
 	mmc->f_max = host->max_clk;
+#else
+	if (0 == strncmp((const char*)mmc_hostname(mmc),"mmc1",sizeof("mmc1")))
+	{
+		int cci_hwid = CCI_HWID_INVALID;
+		int cci_projectid = CCI_PROJECTID_INVALID;
+
+		cci_hwid = get_cci_hw_id();
+		cci_projectid = get_cci_project_id();
+		printk(KERN_ERR "[%s] hostname[%s] cci_hwid[%d] cci_projectid[%d]\n",__func__,mmc_hostname(mmc),cci_hwid,cci_projectid);
+
+		if (CCI_PROJECTID_VY58_59 == cci_projectid)
+		{
+			if (cci_hwid < CCI_HWID_DVT2)
+			    mmc->f_max = UHS_SDR25_MAX_DTR;
+			else
+			    mmc->f_max = host->max_clk;
+		}
+		else
+		{
+			if (cci_hwid < CCI_HWID_PVT)
+			    mmc->f_max = UHS_SDR25_MAX_DTR;
+			else
+			    mmc->f_max = host->max_clk;
+		}
+	}
+	else
+	{
+	    mmc->f_max = host->max_clk;
+	}
+	printk(KERN_ERR "[%s] hostname[%s] host->max_clk[%d] to mmc->f_max[%d]\n",
+		__func__,mmc_hostname(mmc),host->max_clk,mmc->f_max);
+#endif
+
 	if (host->ops->get_min_clock)
 		mmc->f_min = host->ops->get_min_clock(host);
 	else if (host->version >= SDHCI_SPEC_300) {

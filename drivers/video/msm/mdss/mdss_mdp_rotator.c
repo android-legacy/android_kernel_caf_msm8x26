@@ -30,7 +30,7 @@
 static DEFINE_MUTEX(rotator_lock);
 static struct mdss_mdp_rotator_session rotator_session[MAX_ROTATOR_SESSIONS];
 static LIST_HEAD(rotator_queue);
-
+static u32 count; //20140314 QCT_Patch
 static int mdss_mdp_rotator_finish(struct mdss_mdp_rotator_session *rot);
 static void mdss_mdp_rotator_commit_wq_handler(struct work_struct *work);
 static int mdss_mdp_rotator_busy_wait(struct mdss_mdp_rotator_session *rot);
@@ -148,6 +148,14 @@ static int mdss_mdp_rotator_kickoff(struct mdss_mdp_ctl *ctl,
 
 	mutex_lock(&rot->lock);
 	rot->busy = true;
+	//20140314 QCT_Patch S
+	/* fRist kickoff change vbif settings */
+	if (!count) {
+	writel_relaxed(0x08010808, mdss_res->vbif_base + 0xB0);
+	writel_relaxed(0x02101010, mdss_res->vbif_base + 0xC0);
+	count++;
+	}
+	//20140314 QCT_Patch E
 	ret = mdss_mdp_writeback_display_commit(ctl, &wb_args);
 	if (ret) {
 		rot->busy = false;
@@ -652,6 +660,11 @@ static int mdss_mdp_rotator_finish(struct mdss_mdp_rotator_session *rot)
 		else
 			mixer = tmp->mixer_left;
 		mdss_mdp_wb_mixer_destroy(mixer);
+		//20140314 QCT_Patch S
+		writel_relaxed(0x08080808, mdss_res->vbif_base + 0xB0);
+		writel_relaxed(0x10101010, mdss_res->vbif_base + 0xC0);
+		count = 0;
+		//20140314 QCT_Patch E
 	}
 	return ret;
 }

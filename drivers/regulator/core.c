@@ -37,6 +37,10 @@
 
 #include "dummy.h"
 
+#ifdef CONFIG_SONY_EAGLE
+#include <linux/suspend_info.h>
+#endif
+
 #define rdev_crit(rdev, fmt, ...)					\
 	pr_crit("%s: " fmt, rdev_get_name(rdev), ##__VA_ARGS__)
 #define rdev_err(rdev, fmt, ...)					\
@@ -3735,3 +3739,181 @@ unlock:
 	return 0;
 }
 late_initcall(regulator_init_complete);
+
+/* KevinA_Lin 20140218 */
+#if 0
+static unsigned int is_regulator_suspend_valid = 0;
+static unsigned int regulator_number = 0;
+struct  suspend_regulator {
+	struct regulator *regulator_debug;
+	const char *regulator_debug_name;
+	unsigned int regulator_suspend_on_off;
+	unsigned int regulator_suspend_volt;
+	unsigned int regulator_suspend_mode;	
+};
+
+struct suspend_regulator *suspend_regulator_enterprise = NULL; 
+int num;
+void regulator_set_suspend_info(void)
+{
+	const char *rdev_name;
+	char last_name[50];
+	struct regulator_dev *rdev;
+	struct suspend_regulator *sr;
+	struct regulator_map *node;
+	
+	//check rdev number
+	regulator_number = 0;
+	list_for_each_entry(node, &regulator_map_list, list) {
+		rdev = node->regulator;
+		rdev_name = rdev_get_name(rdev);
+		if(strcmp(last_name , rdev_name)==0)
+			continue;
+		pr_info("%s(): regulator_number = %d\n", __func__, regulator_number);
+		pr_info("%s(): rdev_name = %s\n", __func__, rdev_name);
+		pr_info("%s(): last_name = %s\n", __func__, last_name);
+		strncpy(last_name, rdev_name, strlen(rdev_name));
+		last_name[strlen(rdev_name)] = '\0';
+		regulator_number++;
+	}
+
+	//alloc memory
+	if(suspend_regulator_enterprise == NULL)
+		suspend_regulator_enterprise = kzalloc(regulator_number*sizeof(struct suspend_regulator), GFP_KERNEL);
+
+	//search regulator and set regulator related info
+	sr = suspend_regulator_enterprise;	
+	list_for_each_entry(node, &regulator_list, list) {
+		rdev = node->regulator;
+		rdev_name = rdev_get_name(rdev);
+		if(strcmp(last_name , rdev_name)==0)
+			continue;
+		strncpy(last_name, rdev_name, strlen(rdev_name));
+		last_name[strlen(rdev_name)] = '\0';
+		sr->regulator_debug_name = rdev_name;
+		sr->regulator_debug = regulator_get(NULL, rdev_name);
+		sr->regulator_suspend_on_off = regulator_is_enabled(sr->regulator_debug);
+		sr->regulator_suspend_volt = regulator_get_voltage(sr->regulator_debug);
+		sr->regulator_suspend_mode=regulator_get_mode(sr->regulator_debug);
+		regulator_put(sr->regulator_debug);
+		sr->regulator_debug = NULL;
+		sr++;
+	}
+	
+	is_regulator_suspend_valid = 1;
+}
+EXPORT_SYMBOL_GPL(regulator_set_suspend_info);
+#endif
+int regulator_map_list_match(char *suspend_config_regulaotr)
+{
+	struct regulator_dev *rdev;
+
+	list_for_each_entry(rdev, &regulator_list, list) {
+		if (!strcmp(rdev_get_name(rdev) , suspend_config_regulaotr)) {
+			return 1;
+			pr_info("%s: regulator match %s", __func__, rdev_get_name(rdev));
+		}
+	}
+	
+	return 0;
+}
+EXPORT_SYMBOL_GPL(regulator_map_list_match);
+#if 0
+static int print_regulator_state(struct seq_file *s, void *unused)
+{
+	int i;
+	char buf[20];
+	struct suspend_regulator *sr;
+
+	seq_printf(s, "pm8x26  regulator:       on/off     voltage   mode\n");		
+	seq_printf(s, "========================\n");		
+
+	if(is_regulator_suspend_valid)
+	{
+
+		sr = suspend_regulator_enterprise;
+		for(i = 0 ; i < regulator_number ; i++)
+		{
+			switch (sr->regulator_suspend_on_off)
+			{
+				case 0:
+					sprintf(buf, "off");
+					break;
+				case 1:
+					sprintf(buf, "on");
+					break;
+			}
+
+			seq_printf(s, "%-25s:%5s", sr->regulator_debug_name, buf);
+
+			if(sr->regulator_suspend_volt==-EINVAL)
+				seq_printf(s, "             na");
+			else
+				seq_printf(s, "       %8d", sr->regulator_suspend_volt);
+
+			switch(sr->regulator_suspend_mode)
+			{
+				case REGULATOR_MODE_FAST:
+					sprintf(buf, "fast");
+				break;
+				case REGULATOR_MODE_NORMAL:
+					sprintf(buf, "normal");
+				break;
+
+				case REGULATOR_MODE_IDLE:
+					sprintf(buf, "idle");
+				break;
+
+				case REGULATOR_MODE_STANDBY:
+					sprintf(buf, "standby");
+				break;
+
+				default:
+					sprintf(buf, "na");
+				break;		
+			}
+			seq_printf(s, " %8s",buf);
+			seq_printf(s, " \n");
+			sr++;
+		}
+	}
+	else
+	{
+		seq_printf(s, "Not get into suspend state yet\n");
+	}
+
+	return 0;
+}
+
+static int regulator_suspend_info_suspend(void)
+{
+	regulator_set_suspend_info();
+	return 0;
+}
+
+static void regulator_suspend_info_resume(void)
+{
+
+}
+
+static void regulator_suspend_info_dbg_show(struct seq_file *s)
+{
+	print_regulator_state(s, NULL);
+}
+
+static struct suspend_info_ops regulator_suspend_info_ops = {
+	.suspend = regulator_suspend_info_suspend,
+	.resume = regulator_suspend_info_resume,
+	.dbg_show = regulator_suspend_info_dbg_show,
+};
+
+static int __init regulator_suspend_info_init(void)
+{
+	register_suspend_info_ops(&regulator_suspend_info_ops);
+
+	return 0;
+}
+module_init(regulator_suspend_info_init);
+#endif
+
+/* KevinA_Lin 20140218 */

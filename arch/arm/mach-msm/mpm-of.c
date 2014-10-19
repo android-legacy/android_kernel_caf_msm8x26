@@ -299,7 +299,12 @@ static void msm_mpm_set_edge_ctl(int pin, unsigned int flow_type)
 		msm_mpm_rising_edge[index] |= mask;
 	else
 		msm_mpm_rising_edge[index] &= ~mask;
-
+#ifdef CONFIG_SONY_EAGLE
+	if(pin==38 || pin==37) {
+		msm_mpm_falling_edge[index] |= (1<<6);
+		msm_mpm_rising_edge[index] |= (1<<6);
+	}
+#endif
 }
 
 static int msm_mpm_set_irq_type_exclusive(

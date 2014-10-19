@@ -633,7 +633,6 @@ static int kgsl_iommu_pt_equal(struct kgsl_mmu *mmu,
 	pt_base &= KGSL_IOMMU_CTX_TTBR0_ADDR_MASK;
 
 	return (domain_ptbase == pt_base);
-
 }
 
 /*

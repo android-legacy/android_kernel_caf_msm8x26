@@ -574,8 +574,9 @@ static int qpnp_wled_set(struct qpnp_led_data *led)
 
 	num_wled_strings = led->wled_cfg->num_strings;
 
-	level = led->cdev.brightness;
-
+	//level = led->cdev.brightness;  //20131025--Taylor
+	level = 0; //20131025--Taylor
+	
 	if (level > WLED_MAX_LEVEL)
 		level = WLED_MAX_LEVEL;
 	if (level == 0) {
@@ -1513,12 +1514,8 @@ static void qpnp_led_set(struct led_classdev *led_cdev,
 
 	if (value > led->cdev.max_brightness)
 		value = led->cdev.max_brightness;
-
 	led->cdev.brightness = value;
-	if (led->in_order_command_processing)
-		queue_work(led->workqueue, &led->work);
-	else
-		schedule_work(&led->work);
+	schedule_work(&led->work); // goto qpnp_led_work
 }
 
 static void __qpnp_led_work(struct qpnp_led_data *led,
@@ -1626,6 +1623,9 @@ static enum led_brightness qpnp_led_get(struct led_classdev *led_cdev)
 
 	return led->cdev.brightness;
 }
+
+//S:EllenLu 20140123 ,[LED]add for SOMC Illumination
+//E:EllenLu 20140123 ,[LED]add for SOMC Illumination
 
 static void qpnp_led_turn_off_delayed(struct work_struct *work)
 {

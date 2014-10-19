@@ -77,7 +77,7 @@ static struct msm_mdp_interface *mdp_instance;
 static int mdss_fb_register(struct msm_fb_data_type *mfd);
 static int mdss_fb_open(struct fb_info *info, int user);
 static int mdss_fb_release(struct fb_info *info, int user);
-static int mdss_fb_release_all(struct fb_info *info, bool release_all);
+static int mdss_fb_release_all(struct fb_info *info, bool release_all,int user);//[VVVV] JackBB 2013/12/05 Fix no free pipe
 static int mdss_fb_pan_display(struct fb_var_screeninfo *var,
 			       struct fb_info *info);
 static int mdss_fb_check_var(struct fb_var_screeninfo *var,
@@ -526,7 +526,7 @@ static void mdss_fb_shutdown(struct platform_device *pdev)
 
 	mfd->shutdown_pending = true;
 	lock_fb_info(mfd->fbi);
-	mdss_fb_release_all(mfd->fbi, true);
+	mdss_fb_release_all(mfd->fbi, true,1);
 	unlock_fb_info(mfd->fbi);
 }
 
@@ -658,6 +658,7 @@ static void mdss_fb_set_mdp_sync_pt_threshold(struct msm_fb_data_type *mfd)
 		break;
 	}
 }
+
 static int mdss_fb_remove(struct platform_device *pdev)
 {
 	struct msm_fb_data_type *mfd;
@@ -1698,6 +1699,13 @@ static int mdss_fb_open(struct fb_info *info, int user)
 	int pid = current->tgid;
 	struct task_struct *task = current->group_leader;
 
+//S [VVVV] JackBB 2013/11/7
+  if(user == 0)
+  {
+    pr_info("mdss_fb_open() user=%d ",user);
+  }
+//E [VVVV] JackBB 2013/11/7
+
 	if (mfd->shutdown_pending) {
 		pr_err("Shutdown pending. Aborting operation. Request from pid:%d name=%s\n",
 				pid, task->comm);
@@ -1768,7 +1776,7 @@ pm_error:
 	return result;
 }
 
-static int mdss_fb_release_all(struct fb_info *info, bool release_all)
+static int mdss_fb_release_all(struct fb_info *info, bool release_all, int user)//[VVVV] JackBB 2013/12/05 Fix no free pipe
 {
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
 	struct mdss_fb_proc_info *pinfo = NULL, *temp_pinfo = NULL;
@@ -1776,6 +1784,13 @@ static int mdss_fb_release_all(struct fb_info *info, bool release_all)
 	int pid = current->tgid;
 	bool unknown_pid = true, release_needed = false;
 	struct task_struct *task = current->group_leader;
+
+//S [VVVV] JackBB 2013/11/7
+  if(user == 0)
+  {
+    pr_info("mdss_fb_release() user=%d",user);
+  }
+//E [VVVV] JackBB 2013/11/7
 
 	if (!mfd->ref_cnt) {
 		pr_info("try to close unopened fb %d! from %s\n", mfd->index,
@@ -1826,6 +1841,11 @@ static int mdss_fb_release_all(struct fb_info *info, bool release_all)
 
 		if (!release_all)
 			break;
+	}
+
+	if(user == 0)
+	{
+		release_all = true;
 	}
 
 	if (release_needed) {
@@ -1884,7 +1904,7 @@ static int mdss_fb_release_all(struct fb_info *info, bool release_all)
 
 static int mdss_fb_release(struct fb_info *info, int user)
 {
-	return mdss_fb_release_all(info, false);
+	return mdss_fb_release_all(info, false,user);
 }
 
 static void mdss_fb_power_setting_idle(struct msm_fb_data_type *mfd)

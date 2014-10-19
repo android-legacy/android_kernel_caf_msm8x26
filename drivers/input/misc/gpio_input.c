@@ -21,6 +21,9 @@
 #include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/wakelock.h>
+//S:LO
+#include <linux/switch.h>
+//E:LO
 
 enum {
 	DEBOUNCE_UNSTABLE     = BIT(0),	/* Got irq, while debouncing */
@@ -46,8 +49,28 @@ struct gpio_input_state {
 	int debounce_count;
 	spinlock_t irq_lock;
 	struct wake_lock wake_lock;
+	//S:LO
+	struct wake_lock uim1_det_wake_lock;
+#ifdef CCI_SIM_DET_EAGLE_DS
+	struct wake_lock uim2_det_wake_lock;
+#endif
+	//E:LO
 	struct gpio_key_state key_state[0];
 };
+
+//S:LO
+struct switch_dev uim1_det_sw_dev;
+struct workqueue_struct *g_uim1_det_Wq;
+struct work_struct g_uim1_det_work;
+int g_i_uim1;
+#ifdef CCI_SIM_DET_EAGLE_DS
+struct switch_dev uim2_det_sw_dev;
+struct workqueue_struct *g_uim2_det_Wq;
+struct work_struct g_uim2_det_work;
+int g_i_uim2;
+#endif
+//E:LO
+
 
 static enum hrtimer_restart gpio_event_input_timer_func(struct hrtimer *timer)
 {
@@ -130,8 +153,30 @@ static enum hrtimer_restart gpio_event_input_timer_func(struct hrtimer *timer)
 			pr_info("gpio_keys_scan_keys: key %x-%x, %d (%d) "
 				"changed to %d\n", ds->info->type,
 				key_entry->code, i, key_entry->gpio, pressed);
+#ifndef CONFIG_SONY_EAGLE
 		input_event(ds->input_devs->dev[key_entry->dev], ds->info->type,
 			    key_entry->code, pressed);
+#else
+		printk("gpio_keys_scan_keys: key %x-%x, %d (%d) "
+				"changed to %d\n", ds->info->type,
+				key_entry->code, i, key_entry->gpio, pressed);
+                if( key_entry->gpio == 60 ) {
+			g_i_uim1 = pressed;
+			printk("%s - uim1 call queue_work()\n", __FUNCTION__);
+			wake_lock_timeout(&ds->uim1_det_wake_lock, HZ*3);
+			queue_work(g_uim1_det_Wq, &g_uim1_det_work);
+#ifdef CCI_SIM_DET_EAGLE_DS
+                } else if ( key_entry->gpio == 56 ) {
+			g_i_uim2 = pressed;
+			printk("%s - uim2 call queue_work()\n", __FUNCTION__);
+			wake_lock_timeout(&ds->uim2_det_wake_lock, HZ*3);
+			queue_work(g_uim2_det_Wq, &g_uim2_det_work);
+#endif
+		}  else {
+		input_event(ds->input_devs->dev[key_entry->dev], ds->info->type,
+			    key_entry->code, pressed);
+		}
+#endif
 		sync_needed = true;
 	}
 	if (sync_needed) {
@@ -220,6 +265,7 @@ static int gpio_event_input_request_irqs(struct gpio_input_state *ds)
 		err = irq = gpio_to_irq(ds->info->keymap[i].gpio);
 		if (err < 0)
 			goto err_gpio_get_irq_num_failed;
+#ifndef CONFIG_SONY_EAGLE
 		err = request_irq(irq, gpio_event_input_irq_handler,
 				  req_flags, "gpio_keys", &ds->key_state[i]);
 		if (err) {
@@ -228,6 +274,38 @@ static int gpio_event_input_request_irqs(struct gpio_input_state *ds)
 				ds->info->keymap[i].gpio, irq);
 			goto err_request_irq_failed;
 		}
+#else
+		if ( ds->info->keymap[i].gpio == 60 ) {
+			err = request_irq(irq, gpio_event_input_irq_handler,
+				  req_flags, "uim1_det_gpio_irq", &ds->key_state[i]);
+			if (err) {
+				pr_err("uim1_det_gpio_event_input_request_irqs: request_irq "
+					"failed for input %d, irq %d\n",
+					ds->info->keymap[i].gpio, irq);
+				goto err_request_irq_failed;
+			}
+#ifdef CCI_SIM_DET_EAGLE_DS
+		} else if ( ds->info->keymap[i].gpio == 56 ) { 
+			err = request_irq(irq, gpio_event_input_irq_handler,
+				  req_flags, "uim2_det_gpio_irq", &ds->key_state[i]);
+			if (err) {
+				pr_err("uim2_det_gpio_event_input_request_irqs: request_irq "
+					"failed for input %d, irq %d\n",
+					ds->info->keymap[i].gpio, irq);
+				goto err_request_irq_failed;
+			}
+#endif
+		} else {
+		err = request_irq(irq, gpio_event_input_irq_handler,
+				  req_flags, "gpio_keys", &ds->key_state[i]);
+		if (err) {
+			pr_err("gpio_event_input_request_irqs: request_irq "
+				"failed for input %d, irq %d\n",
+				ds->info->keymap[i].gpio, irq);
+			goto err_request_irq_failed;
+		}
+		}
+#endif
 		if (ds->info->info.no_suspend) {
 			err = enable_irq_wake(irq);
 			if (err) {
@@ -254,6 +332,45 @@ err_gpio_get_irq_num_failed:
 	return err;
 }
 
+//S:LO
+static ssize_t pm8226_uim1_det_print_name(struct switch_dev *sdev, char *buf)
+{	
+	switch (switch_get_state(sdev)) {
+	case 0:
+		return sprintf(buf, g_i_uim1?"inserted\n":"removed\n");
+	case 1:
+		return sprintf(buf, g_i_uim1?"inserted\n":"removed\n");
+	}
+	return -EINVAL;
+}
+
+static void pm8226_uim1_det_worker(struct work_struct *work)
+{
+    printk("%s - g_i_uim1 = %d\n", __FUNCTION__, g_i_uim1);
+    switch_set_state(&uim1_det_sw_dev, g_i_uim1);
+}
+
+#ifdef CCI_SIM_DET_EAGLE_DS
+static ssize_t pm8226_uim2_det_print_name(struct switch_dev *sdev, char *buf)
+{	
+	switch (switch_get_state(sdev)) {
+	case 0:
+		return sprintf(buf, g_i_uim2?"inserted\n":"removed\n");
+	case 1:
+		return sprintf(buf, g_i_uim2?"inserted\n":"removed\n");
+	}
+	return -EINVAL;
+}
+
+static void pm8226_uim2_det_worker(struct work_struct *work)
+{
+    printk("%s - g_i_uim2 = %d\n", __FUNCTION__, g_i_uim2);
+    switch_set_state(&uim2_det_sw_dev, g_i_uim2);
+}
+#endif
+//E:LO
+
+
 int gpio_event_input_func(struct gpio_event_input_devs *input_devs,
 			struct gpio_event_info *info, void **data, int func)
 {
@@ -262,6 +379,28 @@ int gpio_event_input_func(struct gpio_event_input_devs *input_devs,
 	unsigned long irqflags;
 	struct gpio_event_input_info *di;
 	struct gpio_input_state *ds = *data;
+
+	//S:LO
+#ifdef CCI_SIM_DET_EAGLE_DS
+	printk("%s - This is a eagle_ds\n",__func__);
+#endif
+
+	uim1_det_sw_dev.name = "pm8226_uim1_det";
+        uim1_det_sw_dev.print_name = pm8226_uim1_det_print_name;    
+    	ret = switch_dev_register(&uim1_det_sw_dev);
+    	if (ret) {
+        	printk("Unable to register uim1 det sw device\n");
+    	}
+    
+#ifdef CCI_SIM_DET_EAGLE_DS
+	uim2_det_sw_dev.name = "pm8226_uim2_det";
+        uim2_det_sw_dev.print_name = pm8226_uim2_det_print_name;    
+    	ret = switch_dev_register(&uim2_det_sw_dev);
+    	if (ret) {
+        	printk("Unable to register uim2 det sw device\n");
+    	}
+#endif
+	//E:LO
 
 	di = container_of(info, struct gpio_event_input_info, info);
 
@@ -298,6 +437,12 @@ int gpio_event_input_func(struct gpio_event_input_devs *input_devs,
 		ds->input_devs = input_devs;
 		ds->info = di;
 		wake_lock_init(&ds->wake_lock, WAKE_LOCK_SUSPEND, "gpio_input");
+		//S:LO
+		wake_lock_init(&ds->uim1_det_wake_lock, WAKE_LOCK_SUSPEND, "uim1_det_gpio_input");
+	#ifdef CCI_SIM_DET_EAGLE_DS
+		wake_lock_init(&ds->uim2_det_wake_lock, WAKE_LOCK_SUSPEND, "uim2_det_gpio_input");
+	#endif
+		//E:LO
 		spin_lock_init(&ds->irq_lock);
 
 		for (i = 0; i < di->keymap_size; i++) {
@@ -317,12 +462,40 @@ int gpio_event_input_func(struct gpio_event_input_devs *input_devs,
 		}
 
 		for (i = 0; i < di->keymap_size; i++) {
+#ifndef CONFIG_SONY_EAGLE
 			ret = gpio_request(di->keymap[i].gpio, "gpio_kp_in");
 			if (ret) {
 				pr_err("gpio_event_input_func: gpio_request "
 					"failed for %d\n", di->keymap[i].gpio);
 				goto err_gpio_request_failed;
 			}
+#else
+			if ( di->keymap[i].gpio == 60 ) {
+				ret = gpio_request(di->keymap[i].gpio, "uim1_det_gpio_input");
+				if (ret) {
+					pr_err("uim1_det_gpio_event_input_func: gpio_request "
+						"failed for %d\n", di->keymap[i].gpio);
+					goto err_gpio_request_failed;
+				}
+#ifdef CCI_SIM_DET_EAGLE_DS
+			} else if ( di->keymap[i].gpio == 56 ) {
+				ret = gpio_request(di->keymap[i].gpio, "uim2_det_gpio_input");
+				if (ret) {
+					pr_err("uim2_det_gpio_event_input_func: gpio_request "
+						"failed for %d\n", di->keymap[i].gpio);
+					goto err_gpio_request_failed;
+				}			
+#endif
+			} else {
+			ret = gpio_request(di->keymap[i].gpio, "gpio_kp_in");
+			if (ret) {
+				pr_err("gpio_event_input_func: gpio_request "
+					"failed for %d\n", di->keymap[i].gpio);
+				goto err_gpio_request_failed;
+			}
+			}
+#endif
+//E:LO
 			ret = gpio_direction_input(di->keymap[i].gpio);
 			if (ret) {
 				pr_err("gpio_event_input_func: "
@@ -333,6 +506,25 @@ int gpio_event_input_func(struct gpio_event_input_devs *input_devs,
 		}
 
 		ret = gpio_event_input_request_irqs(ds);
+
+		//S:LO
+		g_uim1_det_Wq = create_workqueue("uim1_key_rtwq");
+		if (!g_uim1_det_Wq) {
+        		printk("%s: create uim1 workqueue failed\n", __func__);
+        		ret = -ENOMEM;
+        		goto err_create_rtwq_failed;
+		}
+		INIT_WORK(&g_uim1_det_work, pm8226_uim1_det_worker);
+#ifdef CCI_SIM_DET_EAGLE_DS
+		g_uim2_det_Wq = create_workqueue("uim2_key_rtwq");
+		if (!g_uim2_det_Wq) {
+        		printk("%s: create uim2 workqueue failed\n", __func__);
+        		ret = -ENOMEM;
+        		goto err_create_rtwq_failed;
+		}
+		INIT_WORK(&g_uim2_det_work, pm8226_uim2_det_worker);
+#endif
+		//E:LO
 
 		spin_lock_irqsave(&ds->irq_lock, irqflags);
 		ds->use_irq = ret == 0;
@@ -370,7 +562,17 @@ err_gpio_request_failed:
 	}
 err_bad_keymap:
 	wake_lock_destroy(&ds->wake_lock);
+	//S:LO
+	wake_lock_destroy(&ds->uim1_det_wake_lock);
+#ifdef CCI_SIM_DET_EAGLE_DS
+	wake_lock_destroy(&ds->uim2_det_wake_lock);
+#endif
+	//E:LO
 	kfree(ds);
 err_ds_alloc_failed:
 	return ret;
+//S:LO
+err_create_rtwq_failed: 
+	return ret;
+//E:LO
 }

@@ -24,6 +24,7 @@
  */
 
 #include <sound/core.h>
+#include <linux/switch.h>  // BAM_S C 131028 B285 B2123
 
 struct input_dev;
 
@@ -61,8 +62,22 @@ enum snd_jack_types {
 	SND_JACK_BTN_7		= 0x0080000,
 };
 
+// BAM_S C 131028 B285 B2123
+enum hs_sw_dev_state {
+	NO_DEVICE = 0,
+	DEVICE_HEADSET,
+	DEVICE_HEADPHONE,
+	DEVICE_UNSUPPORTED = 0xFE00,
+	DEVICE_UNKNOWN = 0xFF00,
+};
+// BAM_E C 131028
+
 struct snd_jack {
 	struct input_dev *input_dev;
+// BAM_S C 131028 B285 B2123
+	struct input_dev *indev_appkey;
+	struct switch_dev swdev;
+// BAM_E C 131028
 	int registered;
 	int type;
 	const char *id;
