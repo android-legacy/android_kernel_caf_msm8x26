@@ -118,10 +118,18 @@
 /* RX_HPH_CNP_WG_TIME increases by 0.24ms */
 #define WCD9XXX_WG_TIME_FACTOR_US	240
 
+#if 0  // BAM_S 131024 B835
 #define WCD9XXX_V_CS_HS_MAX 500
+#else
+#define WCD9XXX_V_CS_HS_MAX 1500
+#endif  // BAM_E 131024
 #define WCD9XXX_V_CS_NO_MIC 5
 #define WCD9XXX_MB_MEAS_DELTA_MAX_MV 80
+#if 0  // BAM_S 131104 B835
 #define WCD9XXX_CS_MEAS_DELTA_MAX_MV 12
+#else
+#define WCD9XXX_CS_MEAS_DELTA_MAX_MV 80
+#endif  // BAM_E 131104
 
 static int impedance_detect_en;
 module_param(impedance_detect_en, int,

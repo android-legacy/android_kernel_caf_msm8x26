@@ -22,6 +22,9 @@
 #include "msm_camera_io_util.h"
 #include "msm_camera_dt_util.h"
 
+
+extern int cci_camera_source;
+
 struct msm_eeprom_ctrl_t;
 
 #define DEFINE_MSM_MUTEX(mutexname) \

@@ -27,6 +27,11 @@
 #include <linux/platform_device.h>
 #include <mach/scm.h>
 #include <mach/msm_memory_dump.h>
+//[VY5x] ==> CCI KLog, added by Jimmy@CCI
+#ifdef CONFIG_CCI_KLOG
+#include <linux/cciklog.h>
+#endif // #ifdef CONFIG_CCI_KLOG
+//[VY5x] <== CCI KLog, added by Jimmy@CCI
 
 #define MODULE_NAME "msm_watchdog"
 #define WDT0_ACCSCSSNBARK_INT 0
@@ -227,7 +232,7 @@ static ssize_t wdog_disable_set(struct device *dev,
 
 static DEVICE_ATTR(disable, S_IWUSR | S_IRUSR, wdog_disable_get,
 							wdog_disable_set);
-
+extern unsigned int stopwatchdog;
 static void pet_watchdog(struct msm_watchdog_data *wdog_dd)
 {
 	int slack, i, count, prev_count = 0;
@@ -245,7 +250,14 @@ static void pet_watchdog(struct msm_watchdog_data *wdog_dd)
 	slack = ((wdog_dd->bark_time * WDT_HZ) / 1000) - count;
 	if (slack < wdog_dd->min_slack_ticks)
 		wdog_dd->min_slack_ticks = slack;
+#ifdef CCI_KLOG_ALLOW_FORCE_PANIC
+	if(stopwatchdog)	
 	__raw_writel(1, wdog_dd->base + WDT0_RST);
+	else
+		printk("pet_watchdog stop watchdog:\n");
+#else
+	__raw_writel(1, wdog_dd->base + WDT0_RST);
+#endif
 	time_ns = sched_clock();
 	slack_ns = (wdog_dd->last_pet + bark_time_ns) - time_ns;
 	if (slack_ns < wdog_dd->min_slack_ns)
@@ -323,6 +335,15 @@ static irqreturn_t wdog_bark_handler(int irq, void *dev_id)
 	struct msm_watchdog_data *wdog_dd = (struct msm_watchdog_data *)dev_id;
 	unsigned long nanosec_rem;
 	unsigned long long t = sched_clock();
+
+//[VY5x] ==> CCI KLog, added by Jimmy@CCI
+#ifdef CONFIG_CCI_KLOG
+#if CCI_KLOG_CRASH_SIZE
+	set_fault_state(FAULT_LEVEL_WATCHDOG, FAULT_TYPE_NONE, "watchdog");
+#endif // #if CCI_KLOG_CRASH_SIZE
+	cklc_save_magic(KLOG_MAGIC_FIQ_HANG, KLOG_STATE_NONE);
+#endif // #ifdef CONFIG_CCI_KLOG
+//[VY5x] <== CCI KLog, added by Jimmy@CCI
 
 	nanosec_rem = do_div(t, 1000000000);
 	printk(KERN_INFO "Watchdog bark! Now = %lu.%06lu\n", (unsigned long) t,

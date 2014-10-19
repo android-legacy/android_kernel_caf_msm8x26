@@ -24,8 +24,22 @@
 #include <asm/mach/arch.h>
 #include <asm/mach-types.h>
 
+//S, Ramdump
+#ifdef CCI_KLOG_ALLOW_FORCE_PANIC
+#ifdef CONFIG_CCI_KLOG
+#define CCI_RAMDUMP_SIZE                                    (0x400000) //4M
+#define CCI_RAMDUMP_START_ADDR_PHYSICAL     (CCI_KLOG_START_ADDR_PHYSICAL - CCI_RAMDUMP_SIZE)  //0x5C00000
+#endif // #ifdef CONFIG_CCI_KLOG
+#endif // #ifdef CCI_KLOG_ALLOW_FORCE_PANIC
+//E, Ramdump
+
 void __init early_init_dt_add_memory_arch(u64 base, u64 size)
 {
+//[VY5x] ==> CCI KLog, added by Jimmy@CCI
+#ifdef CONFIG_CCI_KLOG
+	int ret = 0;
+#endif // #ifdef CONFIG_CCI_KLOG
+//[VY5x] <== CCI KLog, added by Jimmy@CCI
 #ifndef CONFIG_ARM_LPAE
 	if (base > ((phys_addr_t)~0)) {
 		pr_crit("Ignoring memory at 0x%08llx due to lack of LPAE support\n",
@@ -38,7 +52,37 @@ void __init early_init_dt_add_memory_arch(u64 base, u64 size)
 
 	/* arm_add_memory() already checks for the case of base + size > 4GB */
 #endif
+//[VY5x] ==> CCI KLog, added by Jimmy@CCI
+#ifdef CONFIG_CCI_KLOG
+	printk("%s():start=0x%llX, size=0x%llX\n", __func__, (long long)base, (long long)size);
+	if(base < (long long)CCI_KLOG_START_ADDR_PHYSICAL && base + size > (long long)CCI_KLOG_START_ADDR_PHYSICAL + (long long)CCI_KLOG_SIZE)
+	{
+		ret = arm_add_memory(base, (long long)CCI_KLOG_START_ADDR_PHYSICAL - base);
+		if(ret == 0)
+		{
+			ret = arm_add_memory((long long)CCI_KLOG_START_ADDR_PHYSICAL + (long long)CCI_KLOG_SIZE, base + size - (long long)CCI_KLOG_START_ADDR_PHYSICAL - (long long)CCI_KLOG_SIZE);
+		}
+	}
+//S, Ramdump
+#ifdef CCI_KLOG_ALLOW_FORCE_PANIC
+	else if(base < (long long)CCI_RAMDUMP_START_ADDR_PHYSICAL && base + size > (long long)CCI_RAMDUMP_START_ADDR_PHYSICAL + (long long)CCI_RAMDUMP_SIZE)
+	{
+		ret = arm_add_memory(base, (long long)CCI_RAMDUMP_START_ADDR_PHYSICAL - base);
+		if(ret == 0)
+		{
+			ret = arm_add_memory((long long)CCI_RAMDUMP_START_ADDR_PHYSICAL + (long long)CCI_RAMDUMP_SIZE, base + size - (long long)CCI_RAMDUMP_START_ADDR_PHYSICAL - (long long)CCI_RAMDUMP_SIZE);
+		}
+	}
+#endif // #ifdef CCI_KLOG_ALLOW_FORCE_PANIC
+//E, Ramdump
+	else
+	{
+		ret = arm_add_memory(base, size);
+	}
+#else // #ifdef CONFIG_CCI_KLOG
 	arm_add_memory(base, size);
+#endif // #ifdef CONFIG_CCI_KLOG
+//[VY5x] <== CCI KLog, added by Jimmy@CCI
 }
 
 void * __init early_init_dt_alloc_memory_arch(u64 size, u64 align)

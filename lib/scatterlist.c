@@ -11,6 +11,7 @@
 #include <linux/scatterlist.h>
 #include <linux/highmem.h>
 #include <linux/kmemleak.h>
+#include <linux/vmalloc.h>
 
 /**
  * sg_next - return the next scatterlist entry in a list
@@ -117,6 +118,7 @@ EXPORT_SYMBOL(sg_init_one);
 static struct scatterlist *sg_kmalloc(unsigned int nents, gfp_t gfp_mask)
 {
 	if (nents == SG_MAX_SINGLE_ALLOC) {
+		/**/
 		/*
 		 * Kmemleak doesn't track page allocations as they are not
 		 * commonly used (in a raw form) for kernel data structures.
@@ -126,9 +128,10 @@ static struct scatterlist *sg_kmalloc(unsigned int nents, gfp_t gfp_mask)
 		 * false-positive) we need to inform kmemleak of all the
 		 * intermediate allocations.
 		 */
-		void *ptr = (void *) __get_free_page(gfp_mask);
-		kmemleak_alloc(ptr, PAGE_SIZE, 1, gfp_mask);
-		return ptr;
+		//kmemleak_alloc(ptr, PAGE_SIZE, 1, gfp_mask);
+		//return ptr;
+		return vmalloc(PAGE_SIZE);
+		/**/
 	} else
 		return kmalloc(nents * sizeof(struct scatterlist), gfp_mask);
 }
@@ -136,8 +139,11 @@ static struct scatterlist *sg_kmalloc(unsigned int nents, gfp_t gfp_mask)
 static void sg_kfree(struct scatterlist *sg, unsigned int nents)
 {
 	if (nents == SG_MAX_SINGLE_ALLOC) {
-		kmemleak_free(sg);
-		free_page((unsigned long) sg);
+		/**/
+		//kmemleak_free(sg);
+		//free_page((unsigned long) sg);
+		vfree(sg);
+		/**/
 	} else
 		kfree(sg);
 }

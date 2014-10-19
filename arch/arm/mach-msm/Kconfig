@@ -1522,6 +1522,19 @@ config QSD_PMIC_DEFAULT_DCDC1
 config MSM_FIQ_SUPPORT
 	default y
 	bool "Enable installation of an FIQ handler."
+	select FIQ
+	select GIC_SECURE
+	help
+	  Enable any line to be used as an FIQ. This will help debugging
+	  if apps is not responding and holding lock with irqs disabled.
+	  Modem will then generate an raise a FIQ on this line before sending
+	  SMSM reset.
+
+config SONY_EAGLE
+	bool "Support Sony Eagle"
+	default n
+	help
+	  This enables support for Sony Mobile's 'eagle' device.
 
 config MSM_SERIAL_DEBUGGER
 	select MSM_FIQ_SUPPORT
@@ -1837,22 +1850,6 @@ config MSM_RPCSERVER_HANDSET
 	help
 	  Support for receiving handset events like headset detect,
 	  headset switch and clamshell state.
-
-config MSM_RMT_STORAGE_CLIENT
-	depends on (ARCH_MSM && MSM_ONCRPCROUTER)
-	default n
-	bool "Remote Storage RPC client"
-	help
-	  Provide RPC mechanism for remote processors to access storage
-	  device on apps processor.
-
-config MSM_RMT_STORAGE_CLIENT_STATS
-	depends on (MSM_RMT_STORAGE_CLIENT && DEBUG_FS)
-	default n
-	bool "Remote storage RPC client performance statistics"
-	help
-	  Collects performance statistics and shows this information
-	  through a debugfs file rmt_storage_stats.
 
 config MSM_DALRPC
 	bool "DAL RPC support"
@@ -3053,4 +3050,10 @@ config KRAIT_REGULATOR
 	 line from the PMIC. This supply line is powered by multiple
 	 regulators running in ganged mode inside the PMIC. Enable
 	 this option to support such configurations.
+
+config CCI_HARDWARE_ID
+	bool "CCI Hardware ID Module"
+	depends on MSM_SMD
+	default y
+
 endif

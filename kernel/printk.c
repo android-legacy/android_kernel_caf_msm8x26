@@ -44,9 +44,21 @@
 
 #include <asm/uaccess.h>
 
+//S [VY52/VY55][bug_1807] frank_chan add
+#ifdef CONFIG_CCI_PRINTK_TIME_ISO_8601
+#include <linux/rtc.h>
+#endif // #ifdef CONFIG_CCI_PRINTK_TIME_ISO_8601
+//E [VY52/VY55][bug_1807] frank_chan add
+
 #include <mach/msm_rtb.h>
 #define CREATE_TRACE_POINTS
 #include <trace/events/printk.h>
+
+//[VY5x] ==> CCI KLog, added by Jimmy@CCI
+#ifdef CONFIG_CCI_KLOG
+#include <linux/cciklog.h>
+#endif // #ifdef CONFIG_CCI_KLOG
+//[VY5x] <== CCI KLog, added by Jimmy@CCI
 
 /*
  * Architectures can override it:
@@ -714,8 +726,23 @@ static void call_console_drivers(unsigned start, unsigned end)
 	_call_console_drivers(start_print, end, msg_level);
 }
 
+//[VY5x] ==> CCI KLog, added by Jimmy@CCI
+#ifdef CONFIG_CCI_KLOG
+#define emit_log_char(c) emit_log_char_extend(c, 0)
+static void emit_log_char_extend(char c, int skip)
+#else // #ifdef CONFIG_CCI_KLOG
 static void emit_log_char(char c)
+#endif // #ifdef CONFIG_CCI_KLOG
+//[VY5x] <== CCI KLog, added by Jimmy@CCI
 {
+//[VY5x] ==> CCI KLog, added by Jimmy@CCI
+#ifdef CONFIG_CCI_KLOG
+	if(skip == 0)
+	{
+		cklc_append_kernel_raw_char(c);
+	}
+#endif // #ifdef CONFIG_CCI_KLOG
+//[VY5x] <== CCI KLog, added by Jimmy@CCI
 	LOG_BUF(log_end) = c;
 	log_end++;
 	if (log_end - log_start > log_buf_len)
@@ -889,6 +916,12 @@ static inline void printk_delay(void)
 	}
 }
 
+//S [VY52/VY55][bug_1807] frank_chan add
+#ifdef CONFIG_CCI_PRINTK_TIME_ISO_8601
+struct timespec tm_current_kernel_time(struct rtc_time * tm);
+#endif // #ifdef CONFIG_CCI_PRINTK_TIME_ISO_8601
+//E [VY52/VY55][bug_1807] frank_chan add
+
 asmlinkage int vprintk(const char *fmt, va_list args)
 {
 	int printed_len = 0;
@@ -965,6 +998,14 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 	 */
 	for (; *p; p++) {
 		if (new_text_line) {
+//[VY5x] ==> CCI KLog, added by Jimmy@CCI
+#ifdef CONFIG_CCI_KLOG
+#if CCI_KLOG_CRASH_SIZE
+			set_kernel_log_level(current_log_level);
+#endif // #if CCI_KLOG_CRASH_SIZE
+			cklc_append_time_header(KLOG_KERNEL);
+#endif // #ifdef CONFIG_CCI_KLOG
+//[VY5x] <== CCI KLog, added by Jimmy@CCI
 			new_text_line = 0;
 
 			if (plen) {
@@ -986,6 +1027,19 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 				/* Add the current time stamp */
 				char tbuf[50], *tp;
 				unsigned tlen;
+//S [VY52/VY55][bug_1807] frank_chan add
+#ifdef CONFIG_CCI_PRINTK_TIME
+				struct timespec now;
+#ifdef CONFIG_CCI_PRINTK_TIME_ISO_8601
+				struct rtc_time tm_now;
+				now = tm_current_kernel_time(&tm_now);
+				tlen = sprintf(tbuf, "%02d-%02d %02d:%02d:%02d.%03lu* ", tm_now.tm_mon + 1, tm_now.tm_mday, tm_now.tm_hour, tm_now.tm_min, tm_now.tm_sec, (unsigned long) now.tv_nsec / 1000000);
+#else // #ifdef CONFIG_CCI_PRINTK_TIME_ISO_8601
+				now = current_kernel_time();
+				tlen = sprintf(tbuf, "[%lu.%03lu]* ", now.tv_sec, (unsigned long) now.tv_nsec / 1000000);
+#endif // #ifdef CONFIG_CCI_PRINTK_TIME_ISO_8601
+#else // #ifdef CONFIG_CCI_PRINTK_TIME
+
 				unsigned long long t;
 				unsigned long nanosec_rem;
 
@@ -994,9 +1048,17 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 				tlen = sprintf(tbuf, "[%5lu.%06lu] ",
 						(unsigned long) t,
 						nanosec_rem / 1000);
+#endif // #ifdef CONFIG_CCI_PRINTK_TIME
+//E [VY52/VY55][bug_1807] frank_chan add
 
 				for (tp = tbuf; tp < tbuf + tlen; tp++)
+//[VY5x] ==> CCI KLog, added by Jimmy@CCI
+#ifdef CONFIG_CCI_KLOG
+					emit_log_char_extend(*tp, 1);
+#else // #ifdef CONFIG_CCI_KLOG
 					emit_log_char(*tp);
+#endif // #ifdef CONFIG_CCI_KLOG
+//[VY5x] <== CCI KLog, added by Jimmy@CCI
 				printed_len += tlen;
 			}
 

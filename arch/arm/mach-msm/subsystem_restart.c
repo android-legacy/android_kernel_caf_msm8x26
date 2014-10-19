@@ -42,6 +42,12 @@
 
 #include "smd_private.h"
 
+//[VY5x] ==> CCI KLog, added by Jimmy@CCI
+#ifdef CONFIG_CCI_KLOG
+#include <linux/cciklog.h>
+#endif // #ifdef CONFIG_CCI_KLOG
+//[VY5x] <== CCI KLog, added by Jimmy@CCI
+
 static int enable_debug;
 module_param(enable_debug, int, S_IRUGO | S_IWUSR);
 
@@ -164,6 +170,10 @@ struct subsys_device {
 	struct completion err_ready;
 	bool crashed;
 };
+
+//S [VY52/VY55][bug_1807] frank_chan add
+char work_buf[72];
+//E [VY52/VY55][bug_1807] frank_chan add
 
 static struct subsys_device *to_subsys(struct device *d)
 {
@@ -757,6 +767,30 @@ int subsystem_restart_dev(struct subsys_device *dev)
 
 	pr_info("Restart sequence requested for %s, restart_level = %s.\n",
 		name, restart_levels[dev->restart_level]);
+
+//S [VY52/VY55][bug_1807] frank_chan add
+	memset(work_buf, 0, 72);
+	sprintf(work_buf, "Restart sequence requested for %s, restart_level = %s.\n",name, restart_levels[dev->restart_level]);
+//E [VY52/VY55][bug_1807] frank_chan add
+
+
+
+//[VY5x] ==> CCI KLog, added by Jimmy@CCI
+#ifdef CONFIG_CCI_KLOG
+//modem fatal error
+#if CCI_KLOG_CRASH_SIZE
+	set_fault_state(FAULT_LEVEL_SUBSYSTEM, dev->restart_level, name);
+#endif // #if CCI_KLOG_CRASH_SIZE
+	if(strcmp(name, "modem") == 0)
+	{
+		cklc_save_magic(KLOG_MAGIC_MARM_FATAL, KLOG_STATE_MARM_FATAL);
+	}
+	else
+	{
+		cklc_save_magic(KLOG_MAGIC_SUBSYS_CRASH, KLOG_STATE_SUBSYS_CRASH);
+	}
+#endif // #ifdef CONFIG_CCI_KLOG
+//[VY5x] <== CCI KLog, added by Jimmy@CCI
 
 	switch (dev->restart_level) {
 

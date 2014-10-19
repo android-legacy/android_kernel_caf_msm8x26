@@ -24,6 +24,9 @@
 #define BUFF_SIZE_128 128
 
 #undef CDBG
+
+int gpio69_count = 0;
+
 #ifdef CONFIG_MSMB_CAMERA_DEBUG
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
 #else
@@ -556,7 +559,12 @@ int msm_camera_request_gpio_table(struct gpio *gpio_tbl, uint8_t size,
 			gpio_tbl[i].gpio, gpio_tbl[i].flags);
 	}
 	if (gpio_en) {
+
 		for (i = 0; i < size; i++) {
+			if(gpio_tbl[i].gpio == 69) {
+				gpio69_count = gpio69_count + 1;
+				CDBG("[VY5X] GPIO69_count+1 = %d\n",gpio69_count);
+			}
 			err = gpio_request_one(gpio_tbl[i].gpio,
 				gpio_tbl[i].flags, gpio_tbl[i].label);
 			if (err) {
@@ -571,6 +579,13 @@ int msm_camera_request_gpio_table(struct gpio *gpio_tbl, uint8_t size,
 			}
 		}
 	} else {
+		for (i = 0; i < size; i++) {
+			if(gpio_tbl[i].gpio == 69) {
+				gpio69_count = gpio69_count-1;
+				CDBG("[VY5X] GPIO69_count-1 = %d\n",gpio69_count);
+			}
+		}
+
 		gpio_free_array(gpio_tbl, size);
 	}
 	return rc;

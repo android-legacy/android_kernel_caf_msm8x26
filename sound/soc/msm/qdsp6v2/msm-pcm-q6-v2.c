@@ -45,7 +45,11 @@ struct snd_msm {
 
 #define PLAYBACK_MIN_NUM_PERIODS    2
 #define PLAYBACK_MAX_NUM_PERIODS    8
+#if 0  // BAM_S 140714 B2707 D05525597 D05554084 S01565970 improve audio playback performance
 #define PLAYBACK_MAX_PERIOD_SIZE    12288
+#else
+#define PLAYBACK_MAX_PERIOD_SIZE    ( 12288 * 2 )
+#endif // BAM_E 140714
 #define PLAYBACK_MIN_PERIOD_SIZE    128
 #define CAPTURE_MIN_NUM_PERIODS     2
 #define CAPTURE_MAX_NUM_PERIODS     8

@@ -13,6 +13,11 @@
 #include "power.h"
 
 static suspend_state_t autosleep_state;
+/* 20140218 */
+#ifdef CONFIG_SONY_EAGLE
+static suspend_state_t oldsleep_state;
+#endif
+/* 20140218 */
 static struct workqueue_struct *autosleep_wq;
 /*
  * Note: it is only safe to mutex_lock(&autosleep_lock) if a wakeup_source
@@ -100,14 +105,24 @@ int pm_autosleep_set_state(suspend_state_t state)
 	autosleep_state = state;
 
 	__pm_relax(autosleep_ws);
-
+#ifndef CONFIG_SONY_EAGLE
 	if (state > PM_SUSPEND_ON) {
 		pm_wakep_autosleep_enabled(true);
 		queue_up_suspend_work();
 	} else {
 		pm_wakep_autosleep_enabled(false);
 	}
-
+#else
+	if (state > PM_SUSPEND_ON) {
+		pr_info("%s():  go sleep! state (%d->%d)\n", __func__, oldsleep_state, state);
+		pm_wakep_autosleep_enabled(true);
+		queue_up_suspend_work();
+	} else {
+		pr_info("%s(): go resume! state (%d->%d)\n", __func__, oldsleep_state, state);
+		pm_wakep_autosleep_enabled(false);
+	}
+	oldsleep_state = state;
+#endif
 	mutex_unlock(&autosleep_lock);
 	return 0;
 }

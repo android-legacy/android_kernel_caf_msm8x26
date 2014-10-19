@@ -52,6 +52,56 @@
 #include "spm.h"
 #include "pm.h"
 #include "modem_notifier.h"
+//S:LO
+#include <linux/gpio_event.h>
+//E:LO
+
+
+//S:LO
+#define GPIO_SW_UIM1_DET    60
+#ifdef CCI_SIM_DET_EAGLE_DS
+#define GPIO_SW_UIM2_DET    56
+#endif
+
+static struct gpio_event_direct_entry gpio_sw_gpio_map[] = {
+	{GPIO_SW_UIM1_DET, SW_JACK_PHYSICAL_INSERT},
+#ifdef CCI_SIM_DET_EAGLE_DS
+	{GPIO_SW_UIM2_DET, SW_JACK_PHYSICAL_INSERT},
+#endif
+};
+
+static struct gpio_event_input_info gpio_sw_gpio_info = {
+	.info.func = gpio_event_input_func,
+	.flags = GPIOEDF_ACTIVE_HIGH,
+	.type = EV_SW,
+	.keymap = gpio_sw_gpio_map,
+	.keymap_size = ARRAY_SIZE(gpio_sw_gpio_map),
+	.debounce_time.tv64 = 800 * NSEC_PER_MSEC,
+        .info.no_suspend = false,
+};
+
+static struct gpio_event_info *gpio_key_info[] = {
+	&gpio_sw_gpio_info.info,
+};
+
+struct gpio_event_platform_data gpio_key_data = {
+	.name		= "uim-det-gpio-keys",
+	.info		= gpio_key_info,
+	.info_count	= ARRAY_SIZE(gpio_key_info),
+};
+
+struct platform_device gpio_key_device = {
+	.name	= GPIO_EVENT_DEV_NAME,
+	.id	= -1,
+	.dev	= {
+		.platform_data	= &gpio_key_data,
+	},
+};
+
+static struct platform_device *common_devices[] = {
+	&gpio_key_device,
+};
+//E:LO
 
 static struct memtype_reserve msm8226_reserve_table[] __initdata = {
 	[MEMTYPE_SMI] = {
@@ -139,6 +189,9 @@ void __init msm8226_init(void)
 	msm8226_init_gpiomux();
 	board_dt_populate(adata);
 	msm8226_add_drivers();
+	//S:LO
+	platform_add_devices(common_devices, ARRAY_SIZE(common_devices));
+	//E:LO
 }
 
 static const char *msm8226_dt_match[] __initconst = {

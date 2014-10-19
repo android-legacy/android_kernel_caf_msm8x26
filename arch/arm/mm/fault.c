@@ -36,6 +36,19 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/exception.h>
 
+//[VY5x] ==> CCI KLog, added by Jimmy@CCI
+#ifdef CONFIG_CCI_KLOG
+#include <linux/cciklog.h>
+
+#ifdef CCI_KLOG_CRASH_SIZE
+#if CCI_KLOG_CRASH_SIZE
+const char* get_fsr_name(unsigned int fsr);
+extern void set_fault_state(int level, int type, const char* msg);
+#endif // #if CCI_KLOG_CRASH_SIZE
+#endif // #ifdef CCI_KLOG_CRASH_SIZE
+#endif // #ifdef CONFIG_CCI_KLOG
+//[VY5x] <== CCI KLog, added by Jimmy@CCI
+
 #ifdef CONFIG_MMU
 
 #ifdef CONFIG_KPROBES
@@ -140,6 +153,14 @@ static void
 __do_kernel_fault(struct mm_struct *mm, unsigned long addr, unsigned int fsr,
 		  struct pt_regs *regs)
 {
+//[VY5x] ==> CCI KLog, added by Jimmy@CCI
+#ifdef CCI_KLOG_CRASH_SIZE
+#if CCI_KLOG_CRASH_SIZE
+	int level = FAULT_LEVEL_INIT;
+	int type = FAULT_TYPE_INIT;
+#endif // #if CCI_KLOG_CRASH_SIZE
+#endif // #ifdef CCI_KLOG_CRASH_SIZE
+//[VY5x] <== CCI KLog, added by Jimmy@CCI
 	/*
 	 * Are we prepared to handle this kernel fault?
 	 */
@@ -150,6 +171,23 @@ __do_kernel_fault(struct mm_struct *mm, unsigned long addr, unsigned int fsr,
 	 * No handler, we'll have to terminate things with extreme prejudice.
 	 */
 	bust_spinlocks(1);
+//[VY5x] ==> CCI KLog, added by Jimmy@CCI
+#ifdef CCI_KLOG_CRASH_SIZE
+#if CCI_KLOG_CRASH_SIZE
+	if(fsr & FSR_LNX_PF)//prefetch abort
+	{
+		level = FAULT_LEVEL_PREFETCH_ABORT;
+		type = fsr_fs(fsr & ~FSR_LNX_PF);
+	}
+	else//data abort
+	{
+		level = FAULT_LEVEL_DATA_ABORT;
+		type = fsr_fs(fsr);
+	}
+	set_fault_state(level, type, get_fsr_name(fsr));
+#endif // #if CCI_KLOG_CRASH_SIZE
+#endif // #ifdef CCI_KLOG_CRASH_SIZE
+//[VY5x] <== CCI KLog, added by Jimmy@CCI
 	printk(KERN_ALERT
 		"Unable to handle kernel %s at virtual address %08lx\n",
 		(addr < PAGE_SIZE) ? "NULL pointer dereference" :
@@ -171,9 +209,34 @@ __do_user_fault(struct task_struct *tsk, unsigned long addr,
 		struct pt_regs *regs)
 {
 	struct siginfo si;
+//[VY5x] ==> CCI KLog, added by Jimmy@CCI
+#ifdef CCI_KLOG_CRASH_SIZE
+#if CCI_KLOG_CRASH_SIZE
+	int level = FAULT_LEVEL_INIT;
+	int type = FAULT_TYPE_INIT;
+#endif // #if CCI_KLOG_CRASH_SIZE
+#endif // #ifdef CCI_KLOG_CRASH_SIZE
+//[VY5x] <== CCI KLog, added by Jimmy@CCI
 
 	trace_user_fault(tsk, addr, fsr);
 
+//[VY5x] ==> CCI KLog, added by Jimmy@CCI
+#ifdef CCI_KLOG_CRASH_SIZE
+#if CCI_KLOG_CRASH_SIZE
+	if(fsr & FSR_LNX_PF)//prefetch abort
+	{
+		level = FAULT_LEVEL_PREFETCH_ABORT;
+		type = fsr_fs(fsr & ~FSR_LNX_PF);
+	}
+	else//data abort
+	{
+		level = FAULT_LEVEL_DATA_ABORT;
+		type = fsr_fs(fsr);
+	}
+	kprintk("err_code=0x%X, fault_level=0x%X, fault_type=%d, fault_msg=%s\n", code, level, type, get_fsr_name(fsr));
+#endif // #if CCI_KLOG_CRASH_SIZE
+#endif // #ifdef CCI_KLOG_CRASH_SIZE
+//[VY5x] <== CCI KLog, added by Jimmy@CCI
 #ifdef CONFIG_DEBUG_USER
 	if (((user_debug & UDBG_SEGV) && (sig == SIGSEGV)) ||
 	    ((user_debug & UDBG_BUS)  && (sig == SIGBUS))) {
@@ -716,6 +779,24 @@ do_PrefetchAbort(unsigned long addr, unsigned int ifsr, struct pt_regs *regs)
 	info.si_addr  = (void __user *)addr;
 	arm_notify_die("", regs, &info, ifsr, 0);
 }
+
+//[VY5x] ==> CCI KLog, added by Jimmy@CCI
+#ifdef CCI_KLOG_CRASH_SIZE
+#if CCI_KLOG_CRASH_SIZE
+const char* get_fsr_name(unsigned int fsr)
+{
+	if(fsr & FSR_LNX_PF)//prefetch abort
+	{
+		return ifsr_info[fsr_fs(fsr & ~FSR_LNX_PF)].name;
+	}
+	else//data abort
+	{
+		return fsr_info[fsr_fs(fsr)].name;
+	}
+}
+#endif // #if CCI_KLOG_CRASH_SIZE
+#endif // #ifdef CCI_KLOG_CRASH_SIZE
+//[VY5x] <== CCI KLog, added by Jimmy@CCI
 
 #ifndef CONFIG_ARM_LPAE
 static int __init exceptions_init(void)

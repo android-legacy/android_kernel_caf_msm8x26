@@ -26,6 +26,8 @@ enum {
 	RESET_SUBSYS_COUPLED,
 	RESET_LEVEL_MAX
 };
+#define POWERONOFFRECORD	0xBBCCDD00
+#define IMEM_CERT_RECORD	0x11223344
 
 struct device;
 struct module;

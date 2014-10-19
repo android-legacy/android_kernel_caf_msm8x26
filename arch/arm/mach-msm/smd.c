@@ -2,6 +2,7 @@
  *
  * Copyright (C) 2007 Google, Inc.
  * Copyright (c) 2008-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2013 Sony Mobile Communications AB.
  * Author: Brian Swetland <swetland@google.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -3317,11 +3318,58 @@ static __init int modem_restart_late_init(void)
 }
 late_initcall(modem_restart_late_init);
 
+//S:LE
+#define GPIO_FTM_PIN_NUM 63
+#define GPIO_CAMERA_CAP	107
+
+int ftm_pin_is_low = 0;
+int key_capture_pressed = 0;
+extern int if_board_evt;
+
+EXPORT_SYMBOL(ftm_pin_is_low);
+EXPORT_SYMBOL(key_capture_pressed);
+
+#include <linux/gpio.h>
+//E:LE
+
 int __init msm_smd_init(void)
 {
 	static bool registered;
 	int rc;
 	int i;
+
+	int ret = -1;
+	
+	do{
+		ret = gpio_request(GPIO_FTM_PIN_NUM, "ftm_gpio");
+		if (ret)
+		{
+			printk("Requesting ftm_gpio: FAILED !!!!\n"); 	
+			gpio_free(GPIO_FTM_PIN_NUM);
+			break;
+		}
+
+		ret = gpio_request(GPIO_CAMERA_CAP, "capture_gpio");
+		if (ret)
+		{
+			printk("Requesting capture_gpio: FAILED !!!!\n"); 	
+			gpio_free(GPIO_FTM_PIN_NUM);
+			gpio_free(GPIO_CAMERA_CAP);
+			break;			
+		}		
+		
+		gpio_tlmm_config(GPIO_CFG(GPIO_FTM_PIN_NUM, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA), GPIO_CFG_ENABLE);  
+		gpio_tlmm_config(GPIO_CFG(GPIO_CAMERA_CAP, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA), GPIO_CFG_ENABLE);  
+
+		mdelay(10); //M:LE
+
+		ftm_pin_is_low = (gpio_get_value(GPIO_FTM_PIN_NUM) ? 0 : 1);
+		key_capture_pressed = (gpio_get_value(GPIO_CAMERA_CAP) ? 0 : 1);
+
+		gpio_free(GPIO_FTM_PIN_NUM);
+		gpio_free(GPIO_CAMERA_CAP);
+	}while(0);
+//E:LE
 
 	if (registered)
 		return 0;

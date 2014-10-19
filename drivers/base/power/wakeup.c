@@ -24,6 +24,23 @@
  */
 bool events_check_enabled __read_mostly;
 
+/* 20140612 */
+#ifdef CCI_WAKELOCK_DEBUG
+static struct timespec last_dump_timestamp ;
+static unsigned int cci_pm_active_wakelock_log_period = CONFIG_CCI_PM_ACTIVE_WAKELOCK_LOG_PERIOD;
+static unsigned int wakeup_verbose_enable = 0; // shoot all wakelock log
+static unsigned int wakeup_autosleep_enable = 0; // for discriminating if current state is in sleep flow
+static unsigned int wakeup_blocked_stop = 0;	//stop printing blocked wakelock  when find a suspect
+static unsigned int WAKEUP_DEBUG_TIME = 25000; //the time criterion for discriminating if wakelock is a suspect 
+enum WAKEUP_BEHAVIOR {
+	WAKEUP_AWAKE, 
+	WAKEUP_RELAX, 
+	WAKEUP_TIMER_AWKAE, 
+};
+
+#endif 
+/* 20140612 */
+
 /*
  * Combined counters of registered wakeup events and wakeup events in progress.
  * They need to be modified together atomically, so it's better to use one
@@ -386,7 +403,12 @@ static void wakeup_source_activate(struct wakeup_source *ws)
 
 	/* Increment the counter of events in progress. */
 	cec = atomic_inc_return(&combined_event_count);
-
+/* 20140612 */
+#ifdef CCI_WAKELOCK_DEBUG
+	if (wakeup_verbose_enable && events_check_enabled)
+		pr_info("active new wakelock: %s wakeup pending\n", ws->name);
+#endif	
+/* 20140612 */
 	trace_wakeup_source_activate(ws->name, cec);
 }
 
@@ -404,6 +426,104 @@ static void wakeup_source_report_event(struct wakeup_source *ws)
 	if (!ws->active)
 		wakeup_source_activate(ws);
 }
+
+/* 20140612 */
+#ifdef CCI_WAKELOCK_DEBUG
+static int wakeup_source_get_print_period(void *data, u64 * val)
+{
+	int ret;
+
+	ret = cci_pm_active_wakelock_log_period;
+	*val = ret;
+	return 0;
+}
+
+static int wakeup_source_set_print_period(void *data, u64 val)
+{
+	cci_pm_active_wakelock_log_period = (unsigned int)val;
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(print_fops, wakeup_source_get_print_period, wakeup_source_set_print_period, "%llu\n");
+
+static int wakeup_verbose_get_debug(void *data, u64 * val)
+{
+	int ret;
+
+	ret = wakeup_verbose_enable;
+	*val = ret;
+	return 0;
+}
+
+static int wakeup_verbose_set_debug(void *data, u64 val)
+{
+	wakeup_verbose_enable = (unsigned int)val;
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(enable_fops, wakeup_verbose_get_debug, wakeup_verbose_set_debug, "%llu\n");
+
+static void active_wakelock_print(unsigned int wakelock_policy, struct wakeup_source *ws)
+{
+	struct wakeup_source *ws_recursive;
+	unsigned int wakeup_left_time;
+	ktime_t now = ktime_get();
+	ktime_t current_prevent_time;
+
+	if (wakeup_verbose_enable) {
+		if (current_kernel_time().tv_sec - last_dump_timestamp.tv_sec >= cci_pm_active_wakelock_log_period)
+		{
+			last_dump_timestamp = current_kernel_time();
+			if (wakelock_policy == WAKEUP_AWAKE)
+				pr_info("add new wakelock]  %s\n", ws->name);
+			else if (wakelock_policy == WAKEUP_RELAX)
+				pr_info("relax wakelock  %s\n", ws->name);	
+			else if (wakelock_policy == WAKEUP_TIMER_AWKAE)
+				pr_info("add new timer wakelock %s\n", ws->name);
+
+			pr_info("[list wakelock pool]:\n");
+			list_for_each_entry_rcu(ws_recursive, &wakeup_sources, entry) {
+				//print the all active wakelocks, should enable wakeup_verbose_enable first
+				if (ws_recursive->active) {
+					current_prevent_time =  ktime_sub(now, ws_recursive->start_prevent_time);
+					if(ws_recursive->timer_expires) {
+						wakeup_left_time = jiffies_to_msecs(ws_recursive->timer_expires - jiffies);
+						pr_info("active time wake lock: %s , prevent time %lld, time left %d\n", 
+							ws_recursive->name, ktime_to_ms(current_prevent_time), wakeup_left_time);
+					} else {
+						pr_info("active wake lock: %s , prevent time:%lld\n", ws_recursive->name, ktime_to_ms(current_prevent_time));
+					}
+				}
+			}
+		} else {
+			return;
+		}
+	}
+}
+
+static void wakeup_blocked_print(void)
+{
+	struct wakeup_source *ws_recursive;
+	ktime_t now = ktime_get();
+	ktime_t current_prevent_time;
+
+
+	if(!wakeup_autosleep_enable || wakeup_blocked_stop)
+		return;
+
+	list_for_each_entry_rcu(ws_recursive, &wakeup_sources, entry) {
+		if (ws_recursive->active) {
+			current_prevent_time =  ktime_sub(now, ws_recursive->start_prevent_time);
+			//print the wakelock preventing suspend too long
+			if (ktime_to_ms(current_prevent_time) > WAKEUP_DEBUG_TIME) {
+				pr_info("active wake lock: %s block sleep too long! total %lldms", 
+					ws_recursive->name, ktime_to_ms(current_prevent_time));
+					wakeup_blocked_stop = 1;
+			}
+		}
+		
+	}
+}	
+#endif
+/* 20140612 */
 
 /**
  * __pm_stay_awake - Notify the PM core of a wakeup event.
@@ -424,6 +544,12 @@ void __pm_stay_awake(struct wakeup_source *ws)
 	del_timer(&ws->timer);
 	ws->timer_expires = 0;
 
+/* 20140612 */
+#ifdef CCI_WAKELOCK_DEBUG
+	active_wakelock_print(WAKEUP_AWAKE, ws);//wakelock check
+	wakeup_blocked_print();
+#endif
+/* 20140612 */
 	spin_unlock_irqrestore(&ws->lock, flags);
 }
 EXPORT_SYMBOL_GPL(__pm_stay_awake);
@@ -538,6 +664,13 @@ void __pm_relax(struct wakeup_source *ws)
 	spin_lock_irqsave(&ws->lock, flags);
 	if (ws->active)
 		wakeup_source_deactivate(ws);
+
+/* 20140612 */
+#ifdef CCI_WAKELOCK_DEBUG
+	active_wakelock_print(WAKEUP_RELAX, ws);//wakelock check
+	wakeup_blocked_print();
+#endif
+/* 20140612 */
 	spin_unlock_irqrestore(&ws->lock, flags);
 }
 EXPORT_SYMBOL_GPL(__pm_relax);
@@ -622,6 +755,13 @@ void __pm_wakeup_event(struct wakeup_source *ws, unsigned int msec)
 		mod_timer(&ws->timer, expires);
 		ws->timer_expires = expires;
 	}
+
+/* 20140612 */
+#ifdef CCI_WAKELOCK_DEBUG
+	active_wakelock_print(WAKEUP_TIMER_AWKAE, ws);//wakelock check
+	wakeup_blocked_print();
+#endif
+/* 20140612 */
 
  unlock:
 	spin_unlock_irqrestore(&ws->lock, flags);
@@ -759,6 +899,12 @@ void pm_wakep_autosleep_enabled(bool set)
 		}
 		spin_unlock_irq(&ws->lock);
 	}
+/*20140612*/
+#ifdef CCI_WAKELOCK_DEBUG
+	wakeup_blocked_stop = !set;
+	wakeup_autosleep_enable = set;
+#endif
+/*20140612*/
 	rcu_read_unlock();
 }
 #endif /* CONFIG_PM_AUTOSLEEP */
@@ -850,6 +996,12 @@ static const struct file_operations wakeup_sources_stats_fops = {
 
 static int __init wakeup_sources_debugfs_init(void)
 {
+/* 20140612 */
+#ifdef CCI_WAKELOCK_DEBUG
+	debugfs_create_file("wakeup_verbose", 0644, NULL, NULL, &enable_fops);
+	debugfs_create_file("wakeup_print", 0644, NULL, NULL, &print_fops);
+#endif
+/* 20140612 */
 	wakeup_sources_stats_dentry = debugfs_create_file("wakeup_sources",
 			S_IRUGO, NULL, NULL, &wakeup_sources_stats_fops);
 	return 0;

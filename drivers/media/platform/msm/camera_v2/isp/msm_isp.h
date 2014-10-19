@@ -68,7 +68,8 @@ enum msm_isp_camif_update_state {
 	NO_UPDATE,
 	ENABLE_CAMIF,
 	DISABLE_CAMIF,
-	DISABLE_CAMIF_IMMEDIATELY
+	DISABLE_CAMIF_IMMEDIATELY,
+	DISABLE_CAMIF_IMMEDIATELY_VFE_RECOVER /*QCT patch 20140627 Add*/
 };
 
 enum msm_isp_reset_type {
@@ -148,13 +149,13 @@ struct msm_vfe_axi_ops {
 	uint32_t (*get_wm_mask) (uint32_t irq_status0, uint32_t irq_status1);
 	uint32_t (*get_comp_mask) (uint32_t irq_status0, uint32_t irq_status1);
 	uint32_t (*get_pingpong_status) (struct vfe_device *vfe_dev);
-	long (*halt) (struct vfe_device *vfe_dev);
+	long (*halt) (struct vfe_device *vfe_dev, uint32_t blocking);/*QCT patch 20140627 modify*/
 };
 
 struct msm_vfe_core_ops {
 	void (*reg_update) (struct vfe_device *vfe_dev);
 	long (*reset_hw) (struct vfe_device *vfe_dev,
-		enum msm_isp_reset_type reset_type);
+			enum msm_isp_reset_type reset_type, uint32_t blocking);/*QCT patch 20140627 modify*/
 	int (*init_hw) (struct vfe_device *vfe_dev);
 	void (*init_hw_reg) (struct vfe_device *vfe_dev);
 	void (*release_hw) (struct vfe_device *vfe_dev);
@@ -167,7 +168,13 @@ struct msm_vfe_core_ops {
 		enum msm_vfe_input_src input_src);
 	int (*get_platform_data) (struct vfe_device *vfe_dev);
 	void (*get_error_mask) (uint32_t *error_mask0, uint32_t *error_mask1);
-	void (*process_error_status) (struct vfe_device *vfe_dev);
+	void (*process_error_status) (struct vfe_device *vfe_dev);/*QCT patch 20140627 add*/
+	void (*get_overflow_mask) (uint32_t *overflow_mask);/*QCT patch 20140627 add*/
+	void (*get_irq_mask) (struct vfe_device *vfe_dev,
+		uint32_t *irq0_mask, uint32_t *irq1_mask);/*QCT patch 20140627 add*/
+	void (*restore_irq_mask) (struct vfe_device *vfe_dev);/*QCT patch 20140627 add*/
+	void (*get_halt_restart_mask) (uint32_t *irq0_mask,
+		uint32_t *irq1_mask);/*QCT patch 20140627 add*/
 };
 struct msm_vfe_stats_ops {
 	int (*get_stats_idx) (enum msm_isp_stats_type stats_type);
@@ -279,6 +286,7 @@ struct msm_vfe_axi_stream {
 	enum msm_vfe_axi_stream_type stream_type;
 	uint32_t vt_enable;
 	uint32_t frame_based;
+	enum msm_vfe_frame_skip_pattern frame_skip_pattern; /*QCT patch 20140627 add*/
 	uint32_t framedrop_period;
 	uint32_t framedrop_pattern;
 	uint32_t num_burst_capture;/*number of frame to capture*/
@@ -392,8 +400,20 @@ struct msm_vfe_tasklet_queue_cmd {
 };
 
 #define MSM_VFE_TASKLETQ_SIZE 200
-
+/*QCT patch S 20140627 add*/
+enum msm_vfe_overflow_state {
+	NO_OVERFLOW,
+	OVERFLOW_DETECTED,
+	HALT_REQUESTED,
+	RESTART_REQUESTED,
+};
+/*QCT patch E 20140627 add*/
 struct msm_vfe_error_info {
+	/*QCT patch S 20140627 add*/
+	atomic_t overflow_state;
+	uint32_t overflow_recover_irq_mask0;
+	uint32_t overflow_recover_irq_mask1;
+	/*QCT patch E 20140627 add*/
 	uint32_t error_mask0;
 	uint32_t error_mask1;
 	uint32_t violation_status;

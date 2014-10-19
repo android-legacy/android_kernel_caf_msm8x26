@@ -36,6 +36,16 @@
 #include "peripheral-loader.h"
 #include "scm-pas.h"
 
+//S [VY52/VY55][bug_1807] Frank_Chan add for when modem/WCNSS subsystem restart, failure reason shall be stored at internel sd
+#include <linux/fs.h>
+#include <linux/time.h>
+#include <asm/cputime.h>
+
+#ifdef CONFIG_CCI_PRINTK_TIME_ISO_8601
+#include <linux/rtc.h>
+#endif // #ifdef CONFIG_CCI_PRINTK_TIME_ISO_8601
+//E [VY52/VY55][bug_1807] Frank_Chan add for when modem / WCNSS subsystem restart, failure reason shall be stored at internel sd
+
 #define PRONTO_PMU_COMMON_GDSCR				0x24
 #define PRONTO_PMU_COMMON_GDSCR_SW_COLLAPSE		BIT(0)
 #define CLK_DIS_WAIT					12
@@ -85,8 +95,64 @@ struct pronto_data {
 	bool crash;
 	struct delayed_work cancel_vote_work;
 	struct ramdump_device *ramdump_dev;
-	struct work_struct wcnss_wdog_bite_work;
+        struct work_struct wcnss_wdog_bite_work;
+//S [VY52/VY55][bug_1807] Frank_Chan add
+	struct delayed_work subsys_crash_work;
+//E [VY52/VY55][bug_1807] Frank_Chan add
 };
+
+
+//S [VY52/VY55][bug_1807] Frank_Chan add for when modem/WCNSS subsystem restart, failure reason shall be stored at internel sd
+struct subsys_timestamp {
+	int year;
+	int month;
+	int monthday;
+	int hour;
+	int minute;
+	int second;
+};
+
+enum {
+	DSE_FIRST = 2039,
+};
+
+static const u_int16_t days_since_year[] = {
+	0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334,
+};
+
+static const u_int16_t days_since_leapyear[] = {
+	0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335,
+};
+
+static const u_int16_t days_since_epoch[] = {
+	/* 2039 - 2030 */
+	25202, 24837, 24472, 24106, 23741, 23376, 23011, 22645, 22280, 21915,
+	/* 2029 - 2020 */
+	21550, 21184, 20819, 20454, 20089, 19723, 19358, 18993, 18628, 18262,
+	/* 2019 - 2010 */
+	17897, 17532, 17167, 16801, 16436, 16071, 15706, 15340, 14975, 14610,
+	/* 2009 - 2000 */
+	14245, 13879, 13514, 13149, 12784, 12418, 12053, 11688, 11323, 10957,
+	/* 1999 - 1990 */
+	10592, 10227, 9862, 9496, 9131, 8766, 8401, 8035, 7670, 7305,
+	/* 1989 - 1980 */
+	6940, 6574, 6209, 5844, 5479, 5113, 4748, 4383, 4018, 3652,
+	/* 1979 - 1970 */
+	3287, 2922, 2557, 2191, 1826, 1461, 1096, 730, 365, 0,
+};
+
+#ifdef CONFIG_CCI_PRINTK_TIME_ISO_8601
+struct timespec tm_current_kernel_time(struct rtc_time * tm);
+#endif // #ifdef CONFIG_CCI_PRINTK_TIME_ISO_8601
+
+struct subsys_timestamp pronto_t;
+
+#define CRASH_INFO_SIZE 128
+char pronto_crash_reason1[]= "Fatal error on the wcnss\n";
+char pronto_crash_reason2[CRASH_INFO_SIZE]={0};
+char pronto_fail_str[]= "wcnss subsystem failure reason: ";
+extern char work_buf[72];
+//E [VY52/VY55][bug_1807] Frank_Chan add for when modem/WCNSS subsystem restart, failure reason shall be stored at internel sd
 
 static int pil_pronto_make_proxy_vote(struct pil_desc *pil)
 {
@@ -294,10 +360,127 @@ static void log_wcnss_sfr(void)
 	} else {
 		pr_err("wcnss subsystem failure reason: %.81s\n",
 				smem_reset_reason);
+
+//S [VY52/VY55][bug_1807] Frank_Chan add
+	{
+		unsigned int nStringSize = 0;
+
+		nStringSize = strlen(pronto_fail_str)+min(smem_reset_size, sizeof(pronto_crash_reason2));
+
+		if (nStringSize > CRASH_INFO_SIZE) {
+			nStringSize = CRASH_INFO_SIZE;
+		}
+		memset(pronto_crash_reason2, 0, CRASH_INFO_SIZE);
+		snprintf(pronto_crash_reason2, nStringSize , "%s%s", pronto_fail_str, smem_reset_reason );
+	}
+//E [VY52/VY55][bug_1807] Frank_Chan add
+
 		memset(smem_reset_reason, 0, smem_reset_size);
 		wmb();
 	}
 }
+
+//S [VY52/VY55][bug_1807] Frank_Chan add for when modem/WCNSS subsystem restart, failure reason shall be stored at internel sd
+#ifdef CCI_KLOG_ALLOW_FORCE_PANIC
+static int is_leap(unsigned int y)
+{
+	return y % 4 == 0 && (y % 100 != 0 || y % 400 == 0);
+}
+
+static void pronto_timestamp(int tm) 
+{
+	int i,year;
+	int v, w, z;
+
+	v =tm % 86400;
+	pronto_t.second = v % 60;
+
+	w         = v / 60;
+
+	pronto_t.minute = w % 60;
+	pronto_t.hour   = w / 60;
+
+	z = tm / 86400;
+
+	for (i = 0, year = DSE_FIRST; days_since_epoch[i] > z;
+	    ++i, --year)
+		/* just loop */;
+
+	z -= days_since_epoch[i];
+	pronto_t.year= year;	
+
+
+	if (is_leap(year)) {
+		/* use days_since_leapyear[] in a leap year */
+		for (i = ARRAY_SIZE(days_since_leapyear) - 1;
+		    i > 0 && days_since_leapyear[i] > z; --i)
+			/* just loop */;
+		pronto_t.monthday = z - days_since_leapyear[i] + 1;
+	} else {
+		for (i = ARRAY_SIZE(days_since_year) - 1;
+		    i > 0 && days_since_year[i] > z; --i)
+			/* just loop */;
+		pronto_t.monthday = z - days_since_year[i] + 1;
+	}
+
+	pronto_t.month    = i + 1;
+
+}
+#endif
+
+static void wcnss_subsys_crash_info(struct work_struct *work)
+{
+#ifdef CCI_KLOG_ALLOW_FORCE_PANIC
+	struct file* wcnss_filep;
+	int result = 0;
+	struct timespec current_time;
+	char timestamp[16];
+	int number=0;
+	char ntc_time[21];
+	char s_filename[53];
+#ifdef CONFIG_CCI_PRINTK_TIME_ISO_8601
+	struct rtc_time tm_now;
+#endif
+
+
+//start to get time and transfer to rtc format
+#ifdef CONFIG_CCI_PRINTK_TIME_ISO_8601
+	current_time = tm_current_kernel_time(&tm_now);
+#else
+	current_time = current_kernel_time();
+#endif
+
+	snprintf(timestamp,16, "%08lX",(unsigned long)current_time.tv_sec);
+	number = (int)simple_strtol(timestamp, NULL, 16);
+
+	pronto_timestamp(number);
+	snprintf(ntc_time, 21,
+		"_%04d-%02d-%02d_%02d-%02d-%02d", pronto_t.year,
+		pronto_t.month, pronto_t.monthday, pronto_t.hour, pronto_t.minute, pronto_t.second);
+
+	//spell crash info file name
+	snprintf(s_filename, 53,
+		"/sdcard/ramdump/pronto_crash%s.txt",ntc_time );
+
+
+	wcnss_filep=filp_open(s_filename, O_RDWR | O_CREAT, 0777);
+	if(IS_ERR(wcnss_filep))
+      {
+        pr_err("wcnss subsystem failure reason: %s.\n", pronto_crash_reason2);
+      }
+
+      result = wcnss_filep->f_op->write(wcnss_filep, (void*) pronto_crash_reason1, strlen(pronto_crash_reason1),  &wcnss_filep->f_pos);
+      result = wcnss_filep->f_op->write(wcnss_filep, (void*) work_buf, 63,  &wcnss_filep->f_pos);
+      result = wcnss_filep->f_op->write(wcnss_filep, (void*) pronto_crash_reason2, strlen(pronto_crash_reason2),  &wcnss_filep->f_pos);
+
+      filp_close(wcnss_filep,0);
+
+
+      if(result < 0)
+      pr_err("wcnss_subsys_crash_info: write file fail, result=%d\n",result);
+#endif
+}
+//E [VY52/VY55][bug_1807] Frank_Chan add for when modem/WCNSS subsystem restart, failure reason shall be stored at internel sd
 
 static void restart_wcnss(struct pronto_data *drv)
 {
@@ -319,6 +502,10 @@ static irqreturn_t wcnss_err_fatal_intr_handler(int irq, void *dev_id)
 
 	drv->restart_inprogress = true;
 	restart_wcnss(drv);
+
+//S [VY52/VY55][bug_1807] Frank_Chan add
+	schedule_delayed_work(&drv->subsys_crash_work, msecs_to_jiffies(5000));
+//E [VY52/VY55][bug_1807] Frank_Chan add
 
 	return IRQ_HANDLED;
 }
@@ -501,6 +688,10 @@ static int __devinit pil_pronto_probe(struct platform_device *pdev)
 
 	INIT_DELAYED_WORK(&drv->cancel_vote_work, wcnss_post_bootup);
 	INIT_WORK(&drv->wcnss_wdog_bite_work, wcnss_wdog_bite_work_hdlr);
+
+//S [VY52/VY55][bug_1807] Frank_Chan add
+	INIT_DELAYED_WORK(&drv->subsys_crash_work, wcnss_subsys_crash_info);
+//E [VY52/VY55][bug_1807] Frank_Chan add
 
 	drv->subsys = subsys_register(&drv->subsys_desc);
 	if (IS_ERR(drv->subsys)) {

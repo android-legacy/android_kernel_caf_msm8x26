@@ -21,6 +21,12 @@
 #include <linux/tick.h>
 #include <linux/stop_machine.h>
 
+//S [VY52/VY55][bug_1807] frank_chan add
+#ifdef CONFIG_CCI_PRINTK_TIME_ISO_8601
+#include <linux/rtc.h>
+#endif // #ifdef CONFIG_CCI_PRINTK_TIME_ISO_8601
+//E [VY52/VY55][bug_1807] frank_chan add
+
 /* Structure holding internal timekeeping values. */
 struct timekeeper {
 	/* Current clocksource used for timekeeping. */
@@ -75,7 +81,12 @@ struct timekeeper {
 };
 
 static struct timekeeper timekeeper;
-
+//S [VY52/VY55][bug_1807] frank_chan add
+#ifdef CONFIG_CCI_PRINTK_TIME_ISO_8601
+static struct timespec last_time;
+static struct rtc_time tm_now;
+#endif // #ifdef CONFIG_CCI_PRINTK_TIME_ISO_8601
+//E [VY52/VY55][bug_1807] frank_chan add
 /*
  * This read-write spinlock protects us from races in SMP while
  * playing with xtime.
@@ -1242,6 +1253,102 @@ struct timespec current_kernel_time(void)
 	return now;
 }
 EXPORT_SYMBOL(current_kernel_time);
+
+//S [VY52/VY55][bug_1807] frank_chan add
+#ifdef CONFIG_CCI_PRINTK_TIME_ISO_8601
+struct timespec tm_current_kernel_time(struct rtc_time * tm)
+{
+	struct timespec now;
+	unsigned long temptime;
+
+	now = current_kernel_time();
+
+	//check if we already got a valid RTC time before or RTC is reset
+	if((tm_now.tm_year <= 0) || (now.tv_sec - last_time.tv_sec < 0))
+	{
+		//assign the initial RTC time to tm structure
+		rtc_time_to_tm((unsigned long)now.tv_sec, &tm_now);
+	}
+	else
+	{
+		//add elapsed seconds
+		tm_now.tm_sec += now.tv_sec - last_time.tv_sec;
+
+		if(tm_now.tm_sec >= 60)
+		{
+			tm_now.tm_min += tm_now.tm_sec / 60;
+			tm_now.tm_sec %= 60;
+
+			if(tm_now.tm_min >= 60)
+			{
+				tm_now.tm_hour += tm_now.tm_min / 60;
+				tm_now.tm_min %= 60;
+
+				if(tm_now.tm_hour >= 24)
+				{
+					temptime = tm_now.tm_hour / 24;
+					tm_now.tm_hour %= 24;
+
+					//add elapsed days
+					tm_now.tm_wday += temptime;
+					tm_now.tm_mday += temptime;
+					tm_now.tm_yday += temptime;
+
+					if(tm_now.tm_wday >= 7)
+					{
+						tm_now.tm_wday %= 7;
+					}
+
+					//backup previous yday information for preventing unnecessary update
+					tm->tm_year = tm_now.tm_year;
+					tm->tm_yday = tm_now.tm_yday;
+
+					while(1)
+					{
+						temptime = rtc_month_days(tm_now.tm_mon, tm_now.tm_year + 1900);//days of the month
+
+						if(tm_now.tm_mday >= temptime)
+						{
+							tm_now.tm_mday -= temptime;
+							tm_now.tm_mon++;
+
+							if(tm_now.tm_mon >= 12)
+							{
+								tm_now.tm_year += tm_now.tm_mon / 12;
+								tm_now.tm_mon %= 12;
+							}
+						}
+						else
+						{
+							if(tm->tm_yday != tm_now.tm_yday || tm->tm_year != tm_now.tm_year)
+							{
+								tm_now.tm_yday = rtc_year_days(tm_now.tm_mday, tm_now.tm_mon, tm_now.tm_year + 1900) + 1;//days of the year(0~365)
+							}
+							break;
+						}
+					}
+				}
+			}
+		}
+		//update last_time for next reference
+		last_time = now;
+	}
+	//update tm
+	tm->tm_year = tm_now.tm_year;
+	tm->tm_mon = tm_now.tm_mon;
+	tm->tm_yday = tm_now.tm_yday;
+	tm->tm_mday = tm_now.tm_mday;
+	tm->tm_wday = tm_now.tm_wday;
+	tm->tm_hour = tm_now.tm_hour;
+	tm->tm_min = tm_now.tm_min;
+	tm->tm_sec = tm_now.tm_sec;
+
+	//return timespec
+	return now;
+}
+EXPORT_SYMBOL(tm_current_kernel_time);
+#endif // #ifdef CONFIG_CCI_PRINTK_TIME_ISO_8601
+//E [VY52/VY55][bug_1807] frank_chan add
 
 struct timespec get_monotonic_coarse(void)
 {

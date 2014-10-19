@@ -491,7 +491,7 @@ static int convert_vbatt_uv_to_raw(struct qpnp_bms_chip *chip,
 }
 
 static inline int convert_vbatt_raw_to_uv(struct qpnp_bms_chip *chip,
-					uint16_t reading)
+					uint16_t reading, bool is_pon_ocv)
 {
 	int64_t uv;
 	int rc;
@@ -500,7 +500,7 @@ static inline int convert_vbatt_raw_to_uv(struct qpnp_bms_chip *chip,
 	pr_debug("%u raw converted into %lld uv\n", reading, uv);
 	uv = adjust_vbatt_reading(chip, uv);
 	pr_debug("adjusted into %lld uv\n", uv);
-	rc = qpnp_vbat_sns_comp_result(chip->vadc_dev, &uv);
+	rc = qpnp_vbat_sns_comp_result(chip->vadc_dev, &uv, is_pon_ocv);
 	if (rc)
 		pr_debug("could not compensate vbatt\n");
 	pr_debug("compensated into %lld uv\n", uv);
@@ -699,7 +699,7 @@ static int calib_vadc(struct qpnp_bms_chip *chip)
 
 static void convert_and_store_ocv(struct qpnp_bms_chip *chip,
 				struct raw_soc_params *raw,
-				int batt_temp)
+				int batt_temp, bool is_pon_ocv)
 {
 	int rc;
 
@@ -711,7 +711,7 @@ static void convert_and_store_ocv(struct qpnp_bms_chip *chip,
 		pr_err("Vadc reference voltage read failed, rc = %d\n", rc);
 	chip->prev_last_good_ocv_raw = raw->last_good_ocv_raw;
 	raw->last_good_ocv_uv = convert_vbatt_raw_to_uv(chip,
-					raw->last_good_ocv_raw);
+					raw->last_good_ocv_raw, is_pon_ocv);
 	chip->last_ocv_uv = raw->last_good_ocv_uv;
 	chip->last_ocv_temp = batt_temp;
 	chip->software_cc_uah = 0;
@@ -907,6 +907,29 @@ static int get_simultaneous_batt_v_and_i(struct qpnp_bms_chip *chip,
 	return 0;
 }
 
+#ifdef CONFIG_SONY_EAGLE
+static int get_rbatt(struct qpnp_bms_chip *chip,
+ 									int soc_rbatt_mohm, int batt_temp)
+{
+	int rbatt_mohm, scalefactor;
+
+	rbatt_mohm = chip->default_rbatt_mohm;
+ 	if (chip->rbatt_sf_lut == NULL) {
+ 		pr_debug("RBATT = %d\n", rbatt_mohm);
+ 		return rbatt_mohm;
+ 	}
+ 	/* Convert the batt_temp to DegC from deciDegC */
+ 	scalefactor = interpolate_scalingfactor(chip->rbatt_sf_lut,
+ 										batt_temp, soc_rbatt_mohm);
+	rbatt_mohm = (rbatt_mohm * scalefactor) / 100;
+
+	rbatt_mohm += chip->r_conn_mohm;
+ 	rbatt_mohm += chip->rbatt_capacitive_mohm;
+ 	return rbatt_mohm;
+}
+#endif
+
+#ifndef CONFIG_SONY_EAGLE
 static int estimate_ocv(struct qpnp_bms_chip *chip)
 {
 	int ibat_ua, vbat_uv, ocv_est_uv;
@@ -924,6 +947,29 @@ static int estimate_ocv(struct qpnp_bms_chip *chip)
 	pr_debug("estimated pon ocv = %d\n", ocv_est_uv);
 	return ocv_est_uv;
 }
+#else
+#define DEFAULT_RBATT_SOC 50
+static int estimate_ocv(struct qpnp_bms_chip *chip, int batt_temp) 
+{
+	int ibat_ua, vbat_uv, ocv_est_uv, rbatt_mohm, rc;
+
+	rbatt_mohm = get_rbatt(chip, DEFAULT_RBATT_SOC, batt_temp);
+
+	rc = get_simultaneous_batt_v_and_i(chip, &ibat_ua, &vbat_uv);
+	if (rc) {
+		pr_err("simultaneous failed rc = %d\n", rc);
+		return rc;
+	}
+
+	ocv_est_uv = vbat_uv + (ibat_ua * rbatt_mohm) / 1000;
+
+	pr_debug("estimated pon ocv = %d, vbat_uv = %d ibat_ua = %d rbatt_mohm = %d\n",
+					ocv_est_uv, vbat_uv, ibat_ua, rbatt_mohm);
+	
+	return ocv_est_uv;
+	
+}
+#endif
 
 static void reset_for_new_battery(struct qpnp_bms_chip *chip, int batt_temp)
 {
@@ -1028,28 +1074,46 @@ static int read_soc_params_raw(struct qpnp_bms_chip *chip,
 			chip->base + BMS1_OCV_FOR_SOC_DATA0, 2);
 	if (rc) {
 		pr_err("Error reading ocv: rc = %d\n", rc);
+#ifndef CONFIG_SONY_EAGLE
 		return -ENXIO;
+#else
+		goto param_err;
+#endif
 	}
 
 	rc = read_cc_raw(chip, &raw->cc, CC);
 	rc = read_cc_raw(chip, &raw->shdw_cc, SHDW_CC);
 	if (rc) {
 		pr_err("Failed to read raw cc data, rc = %d\n", rc);
+#ifndef CONFIG_SONY_EAGLE
 		return rc;
+#else
+		goto param_err;
+#endif
 	}
 
 	unlock_output_data(chip);
 	mutex_unlock(&chip->bms_output_lock);
 
 	if (chip->prev_last_good_ocv_raw == OCV_RAW_UNINITIALIZED) {
-		convert_and_store_ocv(chip, raw, batt_temp);
+		convert_and_store_ocv(chip, raw, batt_temp, true);
 		pr_debug("PON_OCV_UV = %d, cc = %llx\n",
 				chip->last_ocv_uv, raw->cc);
 		warm_reset = qpnp_pon_is_warm_reset();
+#ifndef CONFIG_SONY_EAGLE
 		if (raw->last_good_ocv_uv < MIN_OCV_UV
 				|| warm_reset > 0) {
+#else
+		if (raw->last_good_ocv_uv < MIN_OCV_UV || warm_reset > 0) {
+#endif
+		/*[CCI] E- Bug#2723 SR patches Jonny_Chan*/
 			pr_debug("OCV is stale or bad, estimating new OCV.\n");
+#ifndef CONFIG_SONY_EAGLE
 			chip->last_ocv_uv = estimate_ocv(chip);
+#else
+			chip->last_ocv_uv = estimate_ocv(chip, batt_temp);
+#endif
+			/*[CCI] E- Bug#2723 SR patches Jonny_Chan*/
 			raw->last_good_ocv_uv = chip->last_ocv_uv;
 			reset_cc(chip, CLEAR_CC | CLEAR_SHDW_CC);
 			pr_debug("New PON_OCV_UV = %d, cc = %llx\n",
@@ -1078,7 +1142,7 @@ static int read_soc_params_raw(struct qpnp_bms_chip *chip,
 		pr_debug("EOC Battery full ocv_reading = 0x%x\n",
 				chip->ocv_reading_at_100);
 	} else if (chip->prev_last_good_ocv_raw != raw->last_good_ocv_raw) {
-		convert_and_store_ocv(chip, raw, batt_temp);
+		convert_and_store_ocv(chip, raw, batt_temp, false);
 		/* forget the old cc value upon ocv */
 		chip->last_cc_uah = INT_MIN;
 	} else {
@@ -1093,6 +1157,13 @@ static int read_soc_params_raw(struct qpnp_bms_chip *chip,
 			raw->last_good_ocv_raw, raw->last_good_ocv_uv);
 	pr_debug("cc_raw= 0x%llx\n", raw->cc);
 	return 0;
+
+#ifdef CONFIG_SONY_EAGLE
+param_err:
+	unlock_output_data(chip);
+	mutex_unlock(&chip->bms_output_lock);
+	return rc;
+#endif
 }
 
 static int calculate_pc(struct qpnp_bms_chip *chip, int ocv_uv,
@@ -1213,6 +1284,7 @@ static int calculate_cc(struct qpnp_bms_chip *chip, int64_t cc,
 	}
 }
 
+#ifndef CONFIG_SONY_EAGLE
 static int get_rbatt(struct qpnp_bms_chip *chip,
 					int soc_rbatt_mohm, int batt_temp)
 {
@@ -1233,6 +1305,8 @@ static int get_rbatt(struct qpnp_bms_chip *chip,
 	rbatt_mohm += chip->rbatt_capacitive_mohm;
 	return rbatt_mohm;
 }
+#endif
+/*[CCI] E- Bug#2723 SR patches Jonny_Chan*/
 
 #define IAVG_MINIMAL_TIME	2
 static void calculate_iavg(struct qpnp_bms_chip *chip, int cc_uah,
@@ -1503,7 +1577,11 @@ static int get_prop_bms_charge_counter(struct qpnp_bms_chip *chip)
 
 	mutex_lock(&chip->bms_output_lock);
 	lock_output_data(chip);
+#ifndef CONFIG_SONY_EAGLE
 	read_cc_raw(chip, &cc_raw, false);
+#else
+	read_cc_raw(chip, &cc_raw, CC);
+#endif
 	unlock_output_data(chip);
 	mutex_unlock(&chip->bms_output_lock);
 
@@ -1517,7 +1595,11 @@ static int get_prop_bms_charge_counter_shadow(struct qpnp_bms_chip *chip)
 
 	mutex_lock(&chip->bms_output_lock);
 	lock_output_data(chip);
+#ifndef CONFIG_SONY_EAGLE
 	read_cc_raw(chip, &cc_raw, true);
+#else
+	read_cc_raw(chip, &cc_raw, SHDW_CC);
+#endif
 	unlock_output_data(chip);
 	mutex_unlock(&chip->bms_output_lock);
 
@@ -2205,7 +2287,15 @@ static int clamp_soc_based_on_voltage(struct qpnp_bms_chip *chip, int soc)
 		pr_err("adc vbat failed err = %d\n", rc);
 		return soc;
 	}
+#ifndef CONFIG_SONY_EAGLE
 	if (soc == 0 && vbat_uv > chip->v_cutoff_uv) {
+#else
+	/* only clamp when discharging */
+	if (is_battery_charging(chip))
+		return soc;
+	
+	if (soc <= 0 && vbat_uv > chip->v_cutoff_uv) {
+#endif
 		pr_debug("clamping soc to 1, vbat (%d) > cutoff (%d)\n",
 						vbat_uv, chip->v_cutoff_uv);
 		return 1;
@@ -2418,8 +2508,18 @@ static int calculate_state_of_charge(struct qpnp_bms_chip *chip,
 	}
 	mutex_unlock(&chip->soc_invalidation_mutex);
 
+#ifndef CONFIG_SONY_EAGLE
 	pr_debug("SOC before adjustment = %d\n", soc);
 	new_calculated_soc = adjust_soc(chip, &params, soc, batt_temp);
+#else
+	if (chip->first_time_calc_soc && !chip->shutdown_soc_invalid) {
+		pr_debug("Skip adjustment when shutdown SOC has been forced\n");
+		new_calculated_soc = soc;
+	} else {
+		pr_debug("SOC before adjustment = %d\n", soc);
+		new_calculated_soc = adjust_soc(chip, &params, soc, batt_temp);
+	}
+#endif
 
 	/* always clamp soc due to BMS hw/sw immaturities */
 	new_calculated_soc = clamp_soc_based_on_voltage(chip,
@@ -4152,7 +4252,14 @@ static int setup_die_temp_monitoring(struct qpnp_bms_chip *chip)
 	pr_debug("setup complete\n");
 	return 0;
 }
+/* [CCI] S- Bug# Jonny_Chan*/
+static char FuelGauge_drv_FW_version[] = "0001";
 
+char * get_FuelGauge_drv_version(void)
+{
+	return FuelGauge_drv_FW_version;
+}
+/* [CCI] E- Bug# Jonny_Chan*/
 static int __devinit qpnp_bms_probe(struct spmi_device *spmi)
 {
 	struct qpnp_bms_chip *chip;

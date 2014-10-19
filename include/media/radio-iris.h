@@ -723,7 +723,8 @@ enum iris_buf_t {
 	IRIS_BUF_CAL_DATA,
 	IRIS_BUF_RT_PLUS,
 	IRIS_BUF_ERT,
-	IRIS_BUF_MAX,
+	IRIS_BUF_EVENTS_CCI,
+	IRIS_BUF_MAX
 };
 
 enum iris_xfr_t {
