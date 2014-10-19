@@ -38,6 +38,16 @@
 #include "pil-msa.h"
 #include "sysmon.h"
 
+//S [VY52/VY55][bug_1807] Frank_Chan add for when modem/WCNSS subsystem restart, failure reason shall be stored at internel sd
+#include <linux/fs.h>
+#include <linux/time.h>
+#include <asm/cputime.h>
+
+#ifdef CONFIG_CCI_PRINTK_TIME_ISO_8601
+#include <linux/rtc.h>
+#endif // #ifdef CONFIG_CCI_PRINTK_TIME_ISO_8601
+//E [VY52/VY55][bug_1807] Frank_Chan add for when modem/WCNSS subsystem restart, failure reason shall be stored at internel sd
+
 #define MAX_VDD_MSS_UV		1150000
 #define PROXY_TIMEOUT_MS	10000
 #define MAX_SSR_REASON_LEN	81U
@@ -53,7 +63,62 @@ struct modem_data {
 	bool crash_shutdown;
 	bool ignore_errors;
 	struct completion stop_ack;
+//S [VY52/VY55][bug_1807] Frank_Chan add
+	struct delayed_work subsys_crash_work;
+//E [VY52/VY55][bug_1807] Frank_Chan add
 };
+
+//S [VY52/VY55][bug_1807] Frank_Chan add for when modem/WCNSS subsystem restart, failure reason shall be stored at internel sd
+struct subsys_timestamp {
+	int year;
+	int month;
+	int monthday;
+	int hour;
+	int minute;
+	int second;
+};
+
+enum {
+	DSE_FIRST = 2039,
+};
+
+static const u_int16_t days_since_year[] = {
+	0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334,
+};
+
+static const u_int16_t days_since_leapyear[] = {
+	0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335,
+};
+
+static const u_int16_t days_since_epoch[] = {
+	/* 2039 - 2030 */
+	25202, 24837, 24472, 24106, 23741, 23376, 23011, 22645, 22280, 21915,
+	/* 2029 - 2020 */
+	21550, 21184, 20819, 20454, 20089, 19723, 19358, 18993, 18628, 18262,
+	/* 2019 - 2010 */
+	17897, 17532, 17167, 16801, 16436, 16071, 15706, 15340, 14975, 14610,
+	/* 2009 - 2000 */
+	14245, 13879, 13514, 13149, 12784, 12418, 12053, 11688, 11323, 10957,
+	/* 1999 - 1990 */
+	10592, 10227, 9862, 9496, 9131, 8766, 8401, 8035, 7670, 7305,
+	/* 1989 - 1980 */
+	6940, 6574, 6209, 5844, 5479, 5113, 4748, 4383, 4018, 3652,
+	/* 1979 - 1970 */
+	3287, 2922, 2557, 2191, 1826, 1461, 1096, 730, 365, 0,
+};
+
+#define CRASH_INFO_SIZE 128
+char crash_reason1[]= "Fatal error on the modem\n";
+char crash_reason2[CRASH_INFO_SIZE]={0};	//47
+char mss_fail_str[]= "modem subsystem failure reason: ";
+extern char work_buf[72];
+struct subsys_timestamp mss_t;
+
+#ifdef CONFIG_CCI_PRINTK_TIME_ISO_8601
+struct timespec tm_current_kernel_time(struct rtc_time * tm);
+#endif // #ifdef CONFIG_CCI_PRINTK_TIME_ISO_8601
+
+//E [VY52/VY55][bug_1807] Frank_Chan add for when modem/WCNSS subsystem restart, failure reason shall be stored at internel sd
 
 #define subsys_to_drv(d) container_of(d, struct modem_data, subsys_desc)
 
@@ -75,9 +140,128 @@ static void log_modem_sfr(void)
 	strlcpy(reason, smem_reason, min(size, sizeof(reason)));
 	pr_err("modem subsystem failure reason: %s.\n", reason);
 
+//S [VY52/VY55][bug_1807] Frank_Chan add
+	{
+		unsigned int nStringSize = 0;
+
+		nStringSize = strlen(mss_fail_str)+min(size, sizeof(reason));
+
+		if (nStringSize > CRASH_INFO_SIZE) {
+			nStringSize = CRASH_INFO_SIZE;
+		}
+
+		memset(crash_reason2, 0, CRASH_INFO_SIZE);
+		snprintf(crash_reason2, nStringSize, "%s%s", mss_fail_str, reason );
+	}
+//E [VY52/VY55][bug_1807] Frank_Chan add
+
 	smem_reason[0] = '\0';
 	wmb();
 }
+
+//S [VY52/VY55][bug_1807] Frank_Chan add for when modem/WCNSS subsystem restart, failure reason shall be stored at internel sd
+#ifdef CCI_KLOG_ALLOW_FORCE_PANIC
+static int is_leap(unsigned int y)
+{
+	return y % 4 == 0 && (y % 100 != 0 || y % 400 == 0);
+}
+
+static void mss_timestamp(int tm) 
+{
+	int i,year;
+	int v, w, z;
+
+	v =tm % 86400;
+	mss_t.second = v % 60;
+
+	w         = v / 60;
+
+	mss_t.minute = w % 60;
+	mss_t.hour   = w / 60;
+
+	z = tm / 86400;
+
+	
+	for (i = 0, year = DSE_FIRST; days_since_epoch[i] > z; ++i, --year)
+		/* just loop */;
+
+	
+	z -= days_since_epoch[i];
+	mss_t.year= year;	
+
+	if (is_leap(year)) {
+		/* use days_since_leapyear[] in a leap year */
+		for (i = ARRAY_SIZE(days_since_leapyear) - 1;
+		    i > 0 && days_since_leapyear[i] > z; --i)
+			/* just loop */;
+		mss_t.monthday = z - days_since_leapyear[i] + 1;
+		pr_err("mss_timestamp, z=%d, i=%d, monthday=%d\n",z,i,mss_t.monthday);
+	} else {
+		for (i = ARRAY_SIZE(days_since_year) - 1;
+		    i > 0 && days_since_year[i] > z; --i)
+			/* just loop */;
+		mss_t.monthday = z - days_since_year[i] + 1;
+		pr_err("mss_timestamp, z=%d, i=%d, monthday=%d\n",z,i,mss_t.monthday);
+	}
+
+	mss_t.month    = i + 1;
+
+}
+#endif
+
+static void mss_subsys_crash_info(struct work_struct *work)
+{
+#ifdef CCI_KLOG_ALLOW_FORCE_PANIC
+	struct file* modem_filep;
+	int result = 0;
+	struct timespec current_time;
+	char timestamp[16];
+	int number=0;
+	char ntc_time[21];
+	char s_filename[52];
+#ifdef CONFIG_CCI_PRINTK_TIME_ISO_8601
+	struct rtc_time tm_now;
+#endif
+
+//start to get time and transfer to rtc format 
+#ifdef CONFIG_CCI_PRINTK_TIME_ISO_8601
+	current_time = tm_current_kernel_time(&tm_now);
+#else
+	current_time = current_kernel_time();
+#endif
+
+	snprintf(timestamp,16, "%08lX",(unsigned long)current_time.tv_sec);
+	number = (int)simple_strtol(timestamp, NULL, 16);
+
+	mss_timestamp(number);
+	snprintf(ntc_time, 21,
+		"_%04d-%02d-%02d_%02d-%02d-%02d", mss_t.year,
+		mss_t.month, mss_t.monthday, mss_t.hour, mss_t.minute, mss_t.second);
+
+	//spell crash info file name
+	snprintf(s_filename, 52,
+		"/sdcard/ramdump/modem_crash%s.log",ntc_time );
+
+	modem_filep=filp_open(s_filename, O_RDWR | O_CREAT, 0777);
+	if(IS_ERR(modem_filep))
+      {
+        pr_err("modem subsystem failure reason: %s.\n", crash_reason2);
+      }
+
+	result = modem_filep->f_op->write(modem_filep, (void*) crash_reason1, strlen(crash_reason1),  &modem_filep->f_pos);
+      result = modem_filep->f_op->write(modem_filep, (void*) work_buf, 63,  &modem_filep->f_pos);
+	result = modem_filep->f_op->write(modem_filep, (void*) crash_reason2, strlen(crash_reason2),  &modem_filep->f_pos);
+
+      filp_close(modem_filep,0);
+
+
+      if(result < 0)
+      pr_err("mss_subsys_crash_info: write file fail, result=%d\n",result);
+#endif
+}
+//E [VY52/VY55][bug_1807] Frank_Chan add for when modem/WCNSS subsystem restart, failure reason shall be stored at internel sd
+
+
 
 static void restart_modem(struct modem_data *drv)
 {
@@ -97,6 +281,11 @@ static irqreturn_t modem_err_fatal_intr_handler(int irq, void *dev_id)
 	pr_err("Fatal error on the modem.\n");
 	subsys_set_crash_status(drv->subsys, true);
 	restart_modem(drv);
+
+//S [VY52/VY55][bug_1807] Frank_Chan add
+	schedule_delayed_work(&drv->subsys_crash_work, msecs_to_jiffies(5000));
+//E [VY52/VY55][bug_1807] Frank_Chan add
+
 	return IRQ_HANDLED;
 }
 
@@ -205,6 +394,11 @@ static irqreturn_t modem_wdog_bite_intr_handler(int irq, void *dev_id)
 	pr_err("Watchdog bite received from modem software!\n");
 	subsys_set_crash_status(drv->subsys, true);
 	restart_modem(drv);
+
+//S [VY52/VY55][bug_1807] Frank_Chan add
+	schedule_delayed_work(&drv->subsys_crash_work, msecs_to_jiffies(5000));
+//E [VY52/VY55][bug_1807] Frank_Chan add
+
 	return IRQ_HANDLED;
 }
 
@@ -254,6 +448,10 @@ static int __devinit pil_subsys_init(struct modem_data *drv,
 	drv->subsys_desc.err_fatal_handler = modem_err_fatal_intr_handler;
 	drv->subsys_desc.stop_ack_handler = modem_stop_ack_intr_handler;
 	drv->subsys_desc.wdog_bite_handler = modem_wdog_bite_intr_handler;
+
+//S [VY52/VY55][bug_1807] Frank_Chan add
+	INIT_DELAYED_WORK(&drv->subsys_crash_work, mss_subsys_crash_info);
+//E [VY52/VY55][bug_1807] Frank_Chan add
 
 	drv->subsys = subsys_register(&drv->subsys_desc);
 	if (IS_ERR(drv->subsys)) {

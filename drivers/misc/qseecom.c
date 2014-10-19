@@ -679,6 +679,7 @@ static int qseecom_scale_bus_bandwidth(struct qseecom_dev_handle *data,
 static void __qseecom_add_bw_scale_down_timer(uint32_t duration)
 {
 	mutex_lock(&qsee_bw_mutex);
+	del_timer_sync(&(qseecom.bw_scale_down_timer));
 	qseecom.bw_scale_down_timer.expires = jiffies +
 		msecs_to_jiffies(duration);
 	mod_timer(&(qseecom.bw_scale_down_timer),
@@ -4601,6 +4602,7 @@ static int qseecom_resume(struct platform_device *pdev)
 	}
 
 	if (qclk->clk_access_cnt || qseecom.cumulative_mode) {
+		del_timer_sync(&(qseecom.bw_scale_down_timer));
 		qseecom.bw_scale_down_timer.expires = jiffies +
 			msecs_to_jiffies(QSEECOM_SEND_CMD_CRYPTO_TIMEOUT);
 		mod_timer(&(qseecom.bw_scale_down_timer),

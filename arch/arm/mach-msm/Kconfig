@@ -1521,6 +1521,19 @@ config QSD_PMIC_DEFAULT_DCDC1
 config MSM_FIQ_SUPPORT
 	default y
 	bool "Enable installation of an FIQ handler."
+	select FIQ
+	select GIC_SECURE
+	help
+	  Enable any line to be used as an FIQ. This will help debugging
+	  if apps is not responding and holding lock with irqs disabled.
+	  Modem will then generate an raise a FIQ on this line before sending
+	  SMSM reset.
+
+config SONY_EAGLE
+	bool "Support Sony Eagle"
+	default n
+	help
+	  This enables support for Sony Mobile's 'eagle' device.
 
 config MSM_SERIAL_DEBUGGER
 	select MSM_FIQ_SUPPORT
@@ -3043,4 +3056,10 @@ config KRAIT_REGULATOR
 	 line from the PMIC. This supply line is powered by multiple
 	 regulators running in ganged mode inside the PMIC. Enable
 	 this option to support such configurations.
+
+config CCI_HARDWARE_ID
+	bool "CCI Hardware ID Module"
+	depends on MSM_SMD
+	default y
+
 endif

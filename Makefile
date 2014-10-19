@@ -372,7 +372,13 @@ KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -fno-strict-aliasing -fno-common \
 		   -Werror-implicit-function-declaration \
 		   -Wno-format-security \
-		   -fno-delete-null-pointer-checks
+		   -fno-delete-null-pointer-checks \
+		   -DCONFIG_CCI_PRINTK_TIME
+
+ifneq ($(TARGET_BUILD_VARIANT),user)
+KBUILD_CFLAGS	+= -DCONFIG_CCI_PRINTK_TIME_ISO_8601
+endif
+
 KBUILD_AFLAGS_KERNEL :=
 KBUILD_CFLAGS_KERNEL :=
 KBUILD_AFLAGS   := -D__ASSEMBLY__
@@ -614,6 +620,57 @@ ifdef CONFIG_DYNAMIC_FTRACE
 	endif
 endif
 endif
+
+#[VY5x] ==> CCI KLog, added by Jimmy@CCI
+ifeq ($(CCI_KLOG),1)
+	ifndef CONFIG_CCI_KLOG
+		KBUILD_CFLAGS	+= -DCONFIG_CCI_KLOG=y
+	endif # ifndef CONFIG_CCI_KLOG
+	KBUILD_CFLAGS	+= -DCCI_KLOG=y
+	KBUILD_CFLAGS	+= -DCCI_KLOG_START_ADDR_PHYSICAL=$(CCI_KLOG_START_ADDR_PHYSICAL)
+	KBUILD_CFLAGS	+= -DCCI_KLOG_SIZE=$(CCI_KLOG_SIZE)
+	KBUILD_CFLAGS	+= -DCCI_KLOG_HEADER_SIZE=$(CCI_KLOG_HEADER_SIZE)
+	KBUILD_CFLAGS	+= -DCCI_KLOG_CRASH_SIZE=$(CCI_KLOG_CRASH_SIZE)
+	KBUILD_CFLAGS	+= -DCCI_KLOG_APPSBL_SIZE=$(CCI_KLOG_APPSBL_SIZE)
+	KBUILD_CFLAGS	+= -DCCI_KLOG_KERNEL_SIZE=$(CCI_KLOG_KERNEL_SIZE)
+	KBUILD_CFLAGS	+= -DCCI_KLOG_ANDROID_MAIN_SIZE=$(CCI_KLOG_ANDROID_MAIN_SIZE)
+	KBUILD_CFLAGS	+= -DCCI_KLOG_ANDROID_SYSTEM_SIZE=$(CCI_KLOG_ANDROID_SYSTEM_SIZE)
+	KBUILD_CFLAGS	+= -DCCI_KLOG_ANDROID_RADIO_SIZE=$(CCI_KLOG_ANDROID_RADIO_SIZE)
+	KBUILD_CFLAGS	+= -DCCI_KLOG_ANDROID_EVENTS_SIZE=$(CCI_KLOG_ANDROID_EVENTS_SIZE)
+	ifeq ($(CCI_KLOG_SUPPORT_CCI_ENGMODE),1)
+		KBUILD_CFLAGS	+= -DCCI_KLOG_SUPPORT_CCI_ENGMODE=y
+	endif # ifeq ($(CCI_KLOG_SUPPORT_CCI_ENGMODE),1)
+	ifeq ($(CCI_KLOG_ALLOW_FORCE_PANIC),1)
+		KBUILD_CFLAGS	+= -DCCI_KLOG_ALLOW_FORCE_PANIC=y
+	endif # ifeq ($(CCI_KLOG_ALLOW_FORCE_PANIC),1)
+	ifeq ($(CCI_KLOG_SUPPORT_RESTORATION),1)
+		KBUILD_CFLAGS	+= -DCCI_KLOG_SUPPORT_RESTORATION=y
+	endif # ifeq ($(CCI_KLOG_SUPPORT_RESTORATION),1)
+endif # ifeq ($(CCI_KLOG),1)
+#[VY5x] <== CCI KLog, added by Jimmy@CCI
+
+#/* KevinA_Lin, 20140205 */
+ifeq ($(CCI_FORCE_RAMDUMP),1)
+		KBUILD_CFLAGS	+= -DCCI_FORCE_RAMDUMP=y
+endif
+#/* KevinA_Lin, 20140205 */
+
+#/* KevinA_Lin, 20140612 */
+ifeq ($(CCI_WAKELOCK_DEBUG),1)
+		KBUILD_CFLAGS	+= -DCCI_WAKELOCK_DEBUG=y
+endif
+#/* KevinA_Lin, 20140612 */
+#S:LO for sim detection
+ifeq ($(CCI_SIM_DET_EAGLE_DS),1)
+	KBUILD_CFLAGS	+= -DCCI_SIM_DET_EAGLE_DS=y
+endif
+#E:LO for sim detection
+
+#[VY5X] S AlexKuan Bug:2199 Kernel panic - not syncing: Attempted to kill init {
+ifeq ($(CCI_TRACE_INIT_SERVICE),1)
+	KBUILD_CFLAGS	+= -DCCI_TRACE_INIT_SERVICE=y
+endif
+#[VY5X] E AlexKuan Bug:2199 Kernel panic - not syncing: Attempted to kill init }
 
 # We trigger additional mismatches with less inlining
 ifdef CONFIG_DEBUG_SECTION_MISMATCH
@@ -981,6 +1038,7 @@ endif
 prepare2: prepare3 outputmakefile asm-generic
 
 prepare1: prepare2 include/linux/version.h include/generated/utsrelease.h \
+                   include/generated/cciklog_common.h \
                    include/config/auto.conf
 	$(cmd_crmodverdir)
 
@@ -1012,6 +1070,15 @@ define filechk_version.h
 	expr $(VERSION) \* 65536 + 0$(PATCHLEVEL) \* 256 + 0$(SUBLEVEL));    \
 	echo '#define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))';)
 endef
+
+#[SA77] ==> CCI KLog, added by Jimmy@CCI
+define filechk_cciklog_common.h
+	!(cat $(srctree)/../vendor/cci/klogcat/cciklog_common.h)
+endef
+
+include/generated/cciklog_common.h: $(srctree)/Makefile FORCE
+	$(call filechk,cciklog_common.h)
+#[SA77] <== CCI KLog, added by Jimmy@CCI
 
 include/linux/version.h: $(srctree)/Makefile FORCE
 	$(call filechk,version.h)

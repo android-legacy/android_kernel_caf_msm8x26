@@ -314,6 +314,12 @@ config APDS9802ALS
 	  This driver can also be built as a module.  If so, the module
 	  will be called apds9802als.
 
+config SENSORS_STK3X1X
+       bool "SenseTek stk3x1x"
+       depends on I2C
+       help
+       Support for stk3x1x
+
 config ISL29003
 	tristate "Intersil ISL29003 ambient light sensor"
 	depends on I2C && SYSFS
@@ -653,6 +659,11 @@ config USB_HSIC_SMSC_HUB
 
 	  This adds support for connecting devices like mouse in HSIC
 	  Host mode.
+
+config NXP_NFC_PN547
+	tristate "NFC PN547 Driver"
+	default n
+
 
 config TI_DRV2667
 	tristate "TI's DRV2667 haptic controller support"

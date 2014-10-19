@@ -35,6 +35,7 @@
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
 #include <linux/qpnp/pin.h>
+#include <linux/charger_battery.h>  /* [CCI] Jonny_Chan Bug#713 */
 
 /* Interrupt offsets */
 #define INT_RT_STS(base)			(base + 0x10)
@@ -225,6 +226,18 @@
 #define BOOST_FLASH_WA			BIT(1)
 #define POWER_STAGE_WA			BIT(2)
 
+/* [CCI] S- Bug#713 Jonny_Chan*/
+static struct charger_battery_parameters charger_para_table[] = {
+	{CHARGER_CV_CHG_VOLTAGE, 0x00},
+};
+
+
+static struct charger_battery_parameters battery_para_table[] = {
+	{BATTERY_CAPACITY_NOW, 	0x00},
+};
+
+/* [CCI] E- Bug#713 Jonny_Chan*/
+
 struct qpnp_chg_irq {
 	int		irq;
 	unsigned long		disabled;
@@ -361,6 +374,13 @@ struct qpnp_chg_chip {
 	unsigned int			revision;
 	unsigned int			type;
 	unsigned int			tchg_mins;
+	/*[Bug464] S Jonny_Chan */
+	unsigned int			tchg_count;
+	unsigned int			tchg_remain_mins;
+	unsigned int			tchg_sdp_mins;
+	unsigned int			tchg_dcp_mins;
+	unsigned int			prev_chg_type;
+	/*[Bug464] E Jonny_Chan */	
 	unsigned int			thermal_levels;
 	unsigned int			therm_lvl_sel;
 	unsigned int			*thermal_mitigation;
@@ -405,6 +425,14 @@ struct qpnp_chg_chip {
 static void
 qpnp_chg_set_appropriate_battery_current(struct qpnp_chg_chip *chip);
 
+/*[Bug464] S Jonny_Chan */
+#define QPNP_CHG_TCHG_MAX	512
+#define QPNP_CHG_TCHG_MIN	4
+#define QPNP_CHG_TCHG_MASK	0x7F
+#define CHGR_CHG_FAILED_BIT	BIT(7)
+static int qpnp_chg_tchg_max_set(struct qpnp_chg_chip *chip, int minutes);
+/*[Bug464] E Jonny_Chan */
+
 static struct of_device_id qpnp_charger_match_table[] = {
 	{ .compatible = QPNP_CHARGER_DEV_NAME, },
 	{}
@@ -421,6 +449,11 @@ static const char * const bpd_label[] = {
 	[BPD_TYPE_BAT_THM] = "bpd_thm",
 	[BPD_TYPE_BAT_THM_BAT_ID] = "bpd_thm_id",
 };
+
+/* [CCI] S- Bug#713 Jonny_Chan*/
+static int get_suspend_current = 4000;
+/* [CCI] E- Bug#713 Jonny_Chan*/
+static u16 get_suspend_current_enable = 0;  /* [CCI] S- Bug#762 Suspend current*/
 
 enum btc_type {
 	HOT_THD_25_PCT = 25,
@@ -1749,6 +1782,19 @@ qpnp_chg_usb_usbin_valid_irq_handler(int irq, void *_chip)
 			qpnp_chg_iusbmax_set(chip, QPNP_CHG_I_MAX_MIN_100);
 			qpnp_chg_iusb_trim_set(chip, chip->usb_trim_default);
 			chip->prev_usb_max_ma = -EINVAL;
+			/*[Bug464] S Jonny_Chan */
+			chip->tchg_count = 0;
+			chip->tchg_remain_mins = 0;
+			chip->prev_chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
+			qpnp_chg_tchg_max_set(chip, chip->tchg_mins);
+
+			qpnp_chg_masked_write(chip,
+				chip->chgr_base + CHGR_CHG_FAILED,
+				CHGR_CHG_FAILED_BIT,
+				CHGR_CHG_FAILED_BIT, 1);
+			/*[Bug464] E Jonny_Chan */
+			chip->aicl_settled = false;
+
 		} else {
 			/* when OVP clamped usbin, and then decrease
 			 * the charger voltage to lower than the OVP
@@ -1991,19 +2037,55 @@ qpnp_chg_dc_dcin_valid_irq_handler(int irq, void *_chip)
 	return IRQ_HANDLED;
 }
 
+#ifndef CONFIG_SONY_EAGLE
 #define CHGR_CHG_FAILED_BIT	BIT(7)
+#endif
 static irqreturn_t
 qpnp_chg_chgr_chg_failed_irq_handler(int irq, void *_chip)
 {
 	struct qpnp_chg_chip *chip = _chip;
 	int rc;
-
+#ifdef CONFIG_SONY_EAGLE
+	u8 reg = 0; /*[Bug464] Jonny_Chan */
+#endif
 	pr_debug("chg_failed triggered\n");
 
+	/*[Bug464] S Jonny_Chan */
+#ifndef CONFIG_SONY_EAGLE
 	rc = qpnp_chg_masked_write(chip,
 		chip->chgr_base + CHGR_CHG_FAILED,
 		CHGR_CHG_FAILED_BIT,
 		CHGR_CHG_FAILED_BIT, 1);
+#else
+	rc = qpnp_chg_read(chip, &reg,
+	chip->chgr_base + CHGR_TCHG_MAX, 1);
+
+	if (chip->tchg_count > 0) {
+		if ((reg & QPNP_CHG_TCHG_MASK) < QPNP_CHG_TCHG_MASK) {
+			chip->tchg_count = 0;
+			chip->tchg_remain_mins = 0;
+		} else {
+			chip->tchg_count--;
+
+			if (chip->tchg_count == 0) {
+				if (chip->tchg_remain_mins >= QPNP_CHG_TCHG_MIN) {
+				    	rc = qpnp_chg_masked_write(chip,
+					    chip->chgr_base + CHGR_CHG_FAILED,
+					    CHGR_CHG_FAILED_BIT,
+					    CHGR_CHG_FAILED_BIT, 1);	
+						
+					rc = qpnp_chg_tchg_max_set(chip, chip->tchg_remain_mins);
+				}
+			} else {
+	rc = qpnp_chg_masked_write(chip,
+		chip->chgr_base + CHGR_CHG_FAILED,
+		CHGR_CHG_FAILED_BIT,
+		CHGR_CHG_FAILED_BIT, 1);
+			}
+		}
+	}
+	printk("count is %d, usb type is %d\n", chip->tchg_count, chip->prev_chg_type);
+#endif
 	if (rc)
 		pr_err("Failed to write chg_fail clear bit!\n");
 
@@ -2341,6 +2423,9 @@ static enum power_supply_property msm_batt_power_props[] = {
 	POWER_SUPPLY_PROP_SYSTEM_TEMP_LEVEL,
 	POWER_SUPPLY_PROP_CYCLE_COUNT,
 	POWER_SUPPLY_PROP_VOLTAGE_OCV,
+#ifdef CONFIG_SONY_EAGLE
+	POWER_SUPPLY_PROP_USB_PRESENT,  
+#endif	
 };
 
 static char *pm_power_supplied_to[] = {
@@ -2351,7 +2436,12 @@ static char *pm_batt_supplied_to[] = {
 	"bms",
 };
 
+#ifndef CONFIG_SONY_EAGLE
 static int charger_monitor;
+#else
+static int charger_monitor=1;
+#endif
+
 module_param(charger_monitor, int, 0644);
 
 static int ext_ovp_present;
@@ -2704,6 +2794,10 @@ qpnp_batt_external_power_changed(struct power_supply *psy)
 	struct qpnp_chg_chip *chip = container_of(psy, struct qpnp_chg_chip,
 								batt_psy);
 	union power_supply_propval ret = {0,};
+	/*[Bug464] S Jonny_Chan */ 
+	unsigned int safe_time = 0;
+	int rc = 0;
+	/*[Bug464] E Jonny_Chan */
 
 	if (!chip->bms_psy)
 		chip->bms_psy = power_supply_get_by_name("bms");
@@ -2713,12 +2807,49 @@ qpnp_batt_external_power_changed(struct power_supply *psy)
 
 	/* Only honour requests while USB is present */
 	if (qpnp_chg_is_usb_chg_plugged_in(chip)) {
+		/*[Bug464] S Jonny_Chan */
+		chip->usb_psy->get_property(chip->usb_psy,
+			 POWER_SUPPLY_PROP_TYPE, &ret);
+
+		if (chip->prev_chg_type != ret.intval) {
+			chip->prev_chg_type = ret.intval;
+
+			switch (ret.intval) {
+			case POWER_SUPPLY_TYPE_USB:
+				safe_time = chip->tchg_sdp_mins;
+				break;
+			case POWER_SUPPLY_TYPE_USB_DCP:
+			default:
+				safe_time = chip->tchg_dcp_mins;
+				break;
+			}
+
+			chip->tchg_count = safe_time / QPNP_CHG_TCHG_MAX;
+			chip->tchg_remain_mins = safe_time - (chip->tchg_count * QPNP_CHG_TCHG_MAX);
+
+			pr_info("USB type %d, count %d, remain %d mins", ret.intval, chip->tchg_count, chip->tchg_remain_mins);
+			
+			if (chip->tchg_count > 0) {
+				rc = qpnp_chg_tchg_max_set(chip, QPNP_CHG_TCHG_MAX);
+			} else {
+				if (chip->tchg_remain_mins >= QPNP_CHG_TCHG_MIN) {
+					rc = qpnp_chg_tchg_max_set(chip, safe_time);
+				} else {
+					rc = qpnp_chg_tchg_max_set(chip, QPNP_CHG_TCHG_MIN);
+				}
+			}
+			if (rc) {
+				pr_debug("failed setting tchg_mins rc=%d\n", rc);
+			}
+		}
+		/*[Bug464] E Jonny_Chan */		
 		chip->usb_psy->get_property(chip->usb_psy,
 			  POWER_SUPPLY_PROP_CURRENT_MAX, &ret);
 
 		if (chip->prev_usb_max_ma == ret.intval)
 			goto skip_set_iusb_max;
 
+		printk("%s - Iusb_max=%d\n",__func__,ret.intval / 1000); //jonny
 		chip->prev_usb_max_ma = ret.intval;
 
 		if (ret.intval <= 2 && !chip->use_default_batt_values &&
@@ -2760,7 +2891,7 @@ qpnp_batt_external_power_changed(struct power_supply *psy)
 			&& !chip->power_stage_workaround_running
 			&& chip->power_stage_workaround_enable) {
 				chip->power_stage_workaround_running = true;
-				pr_debug("usb wall chg inserted starting power stage workaround charger_monitor = %d\n",
+				pr_info("usb wall chg inserted starting power stage workaround charger_monitor = %d\n",
 						charger_monitor);
 				schedule_work(&chip->reduce_power_stage_work);
 			}
@@ -2780,7 +2911,9 @@ qpnp_batt_power_get_property(struct power_supply *psy,
 {
 	struct qpnp_chg_chip *chip = container_of(psy, struct qpnp_chg_chip,
 								batt_psy);
-
+#ifdef CONFIG_SONY_EAGLE
+	int fake_val = -1; /* [CCI] Bug#713 Jonny_Chan*/
+#endif
 	switch (psp) {
 	case POWER_SUPPLY_PROP_STATUS:
 		val->intval = get_prop_batt_status(chip);
@@ -2810,7 +2943,16 @@ qpnp_batt_power_get_property(struct power_supply *psy,
 		val->intval = chip->insertion_ocv_uv;
 		break;
 	case POWER_SUPPLY_PROP_TEMP:
+#ifndef CONFIG_SONY_EAGLE
 		val->intval = get_prop_batt_temp(chip);
+#else
+		fake_val = batt_func_test_val_read(BATT_FAKE_TEMPERATURE);
+		if ( fake_val >= 0) {
+			val->intval = fake_val;
+		} else {
+			val->intval = get_prop_batt_temp(chip);
+		}
+#endif
 		break;
 	case POWER_SUPPLY_PROP_COOL_TEMP:
 		val->intval = chip->cool_bat_decidegc;
@@ -2819,7 +2961,16 @@ qpnp_batt_power_get_property(struct power_supply *psy,
 		val->intval = chip->warm_bat_decidegc;
 		break;
 	case POWER_SUPPLY_PROP_CAPACITY:
+#ifndef CONFIG_SONY_EAGLE
 		val->intval = get_prop_capacity(chip);
+#else
+		fake_val = batt_func_test_val_read(BATT_FAKE_CAPACITY);
+		if ( fake_val >= 0) {
+			val->intval = fake_val;
+		} else {
+		val->intval = get_prop_capacity(chip);
+		}
+#endif
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_NOW:
 		val->intval = get_prop_current_now(chip);
@@ -2861,6 +3012,11 @@ qpnp_batt_power_get_property(struct power_supply *psy,
 		val->intval = qpnp_chg_vchg_loop_debouncer_setting_get(chip);
 		break;
 
+#ifdef CONFIG_SONY_EAGLE
+	case POWER_SUPPLY_PROP_USB_PRESENT:  
+		val->intval = qpnp_chg_is_usb_chg_plugged_in(chip);  
+		break;  
+#endif	
 	default:
 		return -EINVAL;
 	}
@@ -2944,7 +3100,11 @@ qpnp_chg_ibatterm_set(struct qpnp_chg_chip *chip, int term_current)
 			QPNP_CHG_ITERM_MASK, temp, 1);
 }
 
+#ifndef CONFIG_SONY_EAGLE
 #define QPNP_CHG_IBATMAX_MIN	50
+#else
+#define QPNP_CHG_IBATMAX_MIN	0
+#endif
 #define QPNP_CHG_IBATMAX_MAX	3250
 static int
 qpnp_chg_ibatmax_set(struct qpnp_chg_chip *chip, int chg_current)
@@ -2979,10 +3139,12 @@ qpnp_chg_ibatmax_get(struct qpnp_chg_chip *chip, int *chg_current)
 	return 0;
 }
 
-#define QPNP_CHG_TCHG_MASK	0x7F
 #define QPNP_CHG_TCHG_EN_MASK	0x80
+#ifndef CONFIG_SONY_EAGLE
+#define QPNP_CHG_TCHG_MASK	0x7F
 #define QPNP_CHG_TCHG_MIN	4
 #define QPNP_CHG_TCHG_MAX	512
+#endif
 #define QPNP_CHG_TCHG_STEP	4
 static int qpnp_chg_tchg_max_set(struct qpnp_chg_chip *chip, int minutes)
 {
@@ -5073,6 +5235,10 @@ qpnp_charger_read_dt_props(struct qpnp_chg_chip *chip)
 	OF_PROP_READ(chip, warm_bat_decidegc, "warm-bat-decidegc", rc, 1);
 	OF_PROP_READ(chip, cool_bat_decidegc, "cool-bat-decidegc", rc, 1);
 	OF_PROP_READ(chip, tchg_mins, "tchg-mins", rc, 1);
+	/*[Bug464] S Jonny_Chan */
+	OF_PROP_READ(chip, tchg_sdp_mins, "tchg-sdp-mins", rc, 1);
+	OF_PROP_READ(chip, tchg_dcp_mins, "tchg-dcp-mins", rc, 1);
+	/*[Bug464] E Jonny_Chan */	
 	OF_PROP_READ(chip, hot_batt_p, "batt-hot-percentage", rc, 1);
 	OF_PROP_READ(chip, cold_batt_p, "batt-cold-percentage", rc, 1);
 	OF_PROP_READ(chip, soc_resume_limit, "resume-soc", rc, 1);
@@ -5198,6 +5364,480 @@ qpnp_charger_read_dt_props(struct qpnp_chg_chip *chip)
 	return rc;
 }
 
+/* [CCI] S- Bug#713 Jonny_Chan*/
+
+static int charger_test_function_check(unsigned int set_val, void *data)
+{
+	/*You could implement if needed, such as auto chg/dis-chg function*/
+	return 1;
+}
+
+static int charger_para_check(enum charger_battery_access_method method, int para, unsigned int set_val, void *data)
+{
+	struct qpnp_chg_chip *chip = data;
+	int i = 0;
+	u16 addr = 0;
+	int ret_val = -1;
+	u16 temp = set_val;
+	int ret = -1;
+
+	ret = -1;
+	temp = set_val;
+	
+	for ( i = 0; i < CHARGER_MAX; i++)
+	{
+		if (para == charger_para_table[i].parameters) {
+			addr = charger_para_table[i].addr;
+			break;
+		}
+	}
+
+	switch (para) {
+	/* Below is the case example, you could process what you want for different method
+	case CHARGER_TRICKLE_CHG_VOLTAGE :
+		if (method == CHARGER_BATTERY_PARA_READ) {
+
+		} else if (method == CHARGER_BATTERY_PARA_WRITE) {
+
+		}
+	break;	
+	*/
+	
+	/*Voltage parameters*/
+	case CHARGER_TRICKLE_CHG_VOLTAGE :
+	case CHARGER_CC_CHG_VOLTAGE :
+	break;
+
+	/* [CCI] S- Bug#880 Jonny_Chan*/
+	case CHARGER_CV_CHG_VOLTAGE : /*VDD_MAX test*/
+		
+		if (method == CHARGER_BATTERY_PARA_READ) {
+			ret_val = chip->max_voltage_mv;
+			
+		} else if (method == CHARGER_BATTERY_PARA_WRITE) {
+			chip->max_voltage_mv = (u16)temp;
+			qpnp_chg_set_appropriate_vddmax(chip);
+			ret = 0;
+		}
+
+		if (ret) {
+			pr_info("failed setting resume_voltage rc=%d\n", ret);
+		}
+	break;
+	/* [CCI] E- Bug#880 Jonny_Chan*/
+	
+	case CHARGER_DELTA_CHG_VOLTAGE : /*maintain test*/
+		
+		if (method == CHARGER_BATTERY_PARA_READ) {
+			//ret = pm_chg_vddmax_get(chip, &ret_val);
+			
+		} else if (method == CHARGER_BATTERY_PARA_WRITE) {
+			chip->resume_delta_mv = (u8)temp;
+			ret = qpnp_chg_vbatdet_set(chip,
+					chip->max_voltage_mv - chip->resume_delta_mv);
+		}
+
+		if (ret) {
+			pr_info("failed setting resume_voltage rc=%d\n", ret);
+		}
+	break;
+	
+	/*Current parameters*/
+	case CHARGER_INPUT_CURRENT:
+	break;
+
+	case CHARGER_CC_CHG_CURRENT :
+		if (method == CHARGER_BATTERY_PARA_READ) {
+			ret_val = chip->max_bat_chg_current;
+		} else if (method == CHARGER_BATTERY_PARA_WRITE) {
+
+		}
+	break;
+
+	case CHARGER_TRICKLE_CHG_CURRENT :
+		//None
+	break;
+
+	case CHARGER_TERM_CHG_CURRENT :
+
+	break;
+	
+	/*Timer parameters*/	
+	case CHARGER_PERIODIC_UPDATE_TIME:
+		//None, only heartbeat update time
+	break;
+
+	case CHARGER_TOTAL_CHG_MAX_TIME: /*For power-off chg use*/
+		if (method == CHARGER_BATTERY_PARA_READ) {
+			ret_val = chip->tchg_mins;
+		} else if (method == CHARGER_BATTERY_PARA_WRITE) {
+			chip->tchg_mins = temp;
+			
+			chip->tchg_count = chip->tchg_mins / QPNP_CHG_TCHG_MAX;
+			chip->tchg_remain_mins = chip->tchg_mins - (chip->tchg_count * QPNP_CHG_TCHG_MAX);
+
+			pr_info("count %d, remain %d mins", chip->tchg_count, chip->tchg_remain_mins);
+			
+			if (chip->tchg_count > 0) {
+				ret = qpnp_chg_tchg_max_set(chip, QPNP_CHG_TCHG_MAX);
+			} else {
+				if (chip->tchg_remain_mins >= QPNP_CHG_TCHG_MIN) {
+					ret = qpnp_chg_tchg_max_set(chip, chip->tchg_mins);
+				} else {
+					ret = qpnp_chg_tchg_max_set(chip, QPNP_CHG_TCHG_MIN);
+				}
+			}
+			if (ret) {
+				pr_debug("failed setting tchg_mins rc=%d\n", ret);
+			}
+		}
+	break;
+
+	case CHARGER_AC_TOTAL_CHG_MAX_TIME:
+		if (method == CHARGER_BATTERY_PARA_READ) {
+			ret_val = chip->tchg_dcp_mins;
+		} else if (method == CHARGER_BATTERY_PARA_WRITE) {
+			chip->tchg_dcp_mins = temp;
+		}
+	break;
+
+	case CHARGER_USB_TOTAL_CHG_MAX_TIME:
+		if (method == CHARGER_BATTERY_PARA_READ) {
+			ret_val = chip->tchg_sdp_mins;
+		} else if (method == CHARGER_BATTERY_PARA_WRITE) {
+			chip->tchg_sdp_mins= temp;
+		}
+	break;
+
+	
+	case CHARGER_TRICKLE_CHG_MAX_TIME:
+
+	break;
+
+	case CHARGER_CC_CHG_MAX_TIME :
+		//None
+	break;
+
+	case CHARGER_CV_CHG_MAX_TIME:
+		//None
+	break;
+	
+	/*Protection parameters*/
+	case CHARGER_DLIN_IN_TRACKING_MODE:
+		//None
+	break;
+
+	case CHARGER_HIGH_TEMP_PROTECTION_ENABLE:
+		//None
+	break;
+
+	case CHARGER_LOW_VOLTAGE_PROTECTION_ENABLE:
+		//None
+	break;
+	
+	/*State parameters*/
+	case CHARGER_CHG_FSM :
+
+	break;
+
+	case CHARGER_CHG_PROTECTION_STATE:
+
+	break;
+
+	/*Function parameters*/
+	case CHARGER_FORCE_CHARGE : 
+
+	break;
+
+	case CHARGER_PSE_LEVEL_0:
+	case CHARGER_PSE_LEVEL_1:
+	case CHARGER_PSE_LEVEL_2:
+	case CHARGER_PSE_LEVEL_3:
+	case CHARGER_PSE_LEVEL_4:
+	case CHARGER_PSE_LEVEL_5:
+
+	break;
+	
+	default : 
+		
+	break;
+	}
+
+	pr_info("Para is %d, addr is 0x%4X, val is %d, ret val is %d \n",
+		para, addr, set_val, ret_val );
+	
+	return ret_val;	
+}
+
+static int charger_reg_check(int para, unsigned int set_val, void *data)
+{
+	struct qpnp_chg_chip *chip = data;
+	u16 addr = 0, mask_val = 1;
+	u8 temp = 0;
+	int ret_val = -1;
+	int ret = -1 ;
+
+	switch (para) {
+		
+	case CHARGER_BATTERY_REG_READ:
+		mask_val = charger_battery_mask_val(CHG_REG_MSB - CHG_REG_LSB);
+		addr = set_val & mask_val;
+
+		ret = qpnp_chg_read(chip, &temp, addr, 1);
+		if (ret) {
+			pr_err("spmi read failed: addr=%03X, rc=%d\n", addr, ret);
+			return ret;
+		}
+
+		ret_val = (u8)temp;	
+	break;
+	
+	case CHARGER_BATTERY_REG_WRITE :
+		mask_val = charger_battery_mask_val(CHG_REG_TEST_MAX - CHG_REG_MSB);
+		addr = (set_val >> CHG_REG_MSB) & mask_val;
+
+		mask_val = charger_battery_mask_val(CHG_REG_MSB - CHG_REG_LSB);
+		set_val = (u8)set_val & mask_val;
+
+		temp = (u8)set_val;
+		ret = qpnp_chg_write(chip, &temp, addr, 1);
+		ret_val = ret;
+	break;
+	
+	default : 
+		
+	break;
+	}
+	
+	pr_info("Para is %d, addr is 0x%4X, val is 0x%2X, Retval is 0x%2X \n",
+		para, addr, set_val, ret_val );
+
+	return ret_val;	
+}
+int charger_callback(enum charger_battery_access_method method, int para, unsigned int set_val, void *data)
+{
+	int retval = -1;
+	
+	if ((method == CHARGER_BATTERY_PARA_READ) || (method == CHARGER_BATTERY_PARA_WRITE) ){
+		retval = charger_para_check(method, para, set_val, data);
+	} else if(method == CHARGER_AUTO_CHARGE) {
+		retval = charger_test_function_check(set_val, data);
+	} else if(method == CHARGER_BATTERY_REG_PROCESS) {
+		retval = charger_reg_check(para, set_val, data);
+	} 	
+
+	pr_info("method is %d, Para is 0x%2X, val is %d, ret val is %d"
+			,method ,para, set_val, retval );
+
+	return retval;
+}
+
+
+#if 1
+static int batt_test_function_check(unsigned int set_val, void *data)
+{
+	struct qpnp_chg_chip *chip = data;
+	int  is_enable = set_val & 0x01;
+
+	if (is_enable == 1) {
+		power_supply_changed(&chip->batt_psy);
+	}
+
+	return 1;
+}
+static int battery_para_check(enum charger_battery_access_method method, int para, unsigned int set_val, void *data)
+{
+
+	struct qpnp_chg_chip *chip = data;
+	int i = 0;
+	u16 addr = 0;
+	int ret_val = -1;
+	u16 temp = set_val;  /* [CCI] S- Bug#762 Suspend current*/
+	
+	for ( i = 0; i < BATTERY_MAX; i++)
+	{
+		if (para == battery_para_table[i].parameters) {
+			addr = battery_para_table[i].addr;
+			break;
+		}
+	}
+	
+	switch (para) {
+	/* Below is the case example, you could process what you want for different method
+	case BATTERY_TOTAL_CAPACITY :
+		if (method == CHARGER_BATTERY_READ) {
+
+		} else if (method == CHARGER_BATTERY_WRITE) {
+
+		}
+	break;	
+	*/
+      
+	case BATTERY_TOTAL_CAPACITY:
+
+	break;
+	
+	case BATTERY_VOLTAGE :
+
+	break;
+	
+	case BATTERY_CHARGE_CURRENT : 
+
+	break;
+		
+	case BATTERY_CHARGE_SUSPEND_CURRENT : 
+		if (method == CHARGER_BATTERY_PARA_READ) {
+			ret_val = get_suspend_current;
+		} else if (method == CHARGER_BATTERY_PARA_WRITE) {
+
+		}
+	break;
+	
+	/* [CCI] S- Bug#762 Suspend current*/
+	case BATTERY_CHARGE_SUSPEND_CURRENT_ENABLE : 
+		if (method == CHARGER_BATTERY_PARA_READ) {
+			ret_val = get_suspend_current_enable;
+		} else if (method == CHARGER_BATTERY_PARA_WRITE) {
+			get_suspend_current_enable = temp;
+		}
+	break;
+	/* [CCI] E- Bug#762 Suspend current*/
+
+	case BATTERY_TEMPERATURE :
+		ret_val = get_prop_batt_temp(chip);
+	break;
+
+	case BATTERY_CAPACITY_NOW:
+
+	break;
+
+	case BATTERY_UEVENT_UPDATE :
+		/*add chip->update_time if needed*/
+	break;
+	
+	case BATTERY_SAFETY_IS_TRIGGERED : 
+		
+	break;
+
+	case BATTERY_PRESENT :
+
+	break;
+
+	
+	case BATTERY_HEALTH_STATUS :
+
+	break;
+	
+	case BATTERY_CHARGING_STATE :
+
+	break;
+
+	break;
+	default : 
+		
+	break;
+	
+	}
+
+
+	pr_info("Para is %d, addr is 0x%4X, val is %d, Retval is %d \n",
+		para, addr, set_val, ret_val);
+	
+	return ret_val;
+}
+
+static int battery_reg_check(int para, unsigned int set_val, void *data)
+{
+	u16 addr = 0, mask_val = 1;
+	int temp = 0;
+	int ret_val = -1;
+
+	switch (para) {
+		
+	case CHARGER_BATTERY_REG_READ:
+		mask_val = charger_battery_mask_val(BATT_REG_MSB - BATT_REG_LSB);
+		addr = set_val & mask_val;
+		
+		ret_val = (u16)temp;
+	break;
+	
+	case CHARGER_BATTERY_REG_WRITE :
+		mask_val = charger_battery_mask_val(BATT_REG_TEST_MAX - BATT_REG_MSB);
+		addr = (set_val >> BATT_REG_MSB) & mask_val;
+
+		mask_val = charger_battery_mask_val(BATT_REG_MSB - CHG_REG_LSB);
+		set_val = set_val & mask_val;
+	break;
+	
+	default : 
+		
+	break;
+	}
+	pr_info("Para is %d, addr is 0x%4X, val is %d, retval is %d \n",
+			para, addr, set_val, ret_val );
+	
+	return ret_val;	
+}
+static int battery_callback(enum charger_battery_access_method method, int para, unsigned int set_val, void *data)
+{
+	int retval = -1;	
+
+	if ((method == CHARGER_BATTERY_PARA_READ) || (method == CHARGER_BATTERY_PARA_WRITE) ){
+		retval = battery_para_check(method, para, set_val, data);
+	} else if(method == BATTERY_GAUGE_TEST) {
+		retval = batt_test_function_check(set_val, data);
+	} else if(method == CHARGER_BATTERY_REG_PROCESS) {
+		retval = battery_reg_check(para, set_val, data);
+	} 		
+
+	pr_info("method is %d, Para is 0x%2X, val is %d, ret val is %d",
+		method ,para, set_val, retval );
+
+	return retval;
+}
+#endif
+/* [CCI] E- Bug#713 Jonny_Chan*/
+
+/* [CCI] S- Bug# Jonny_Chan*/
+
+static char charger_drv_FW_version[] = "0001";
+
+char * get_charger_drv_version(void)
+{
+	return charger_drv_FW_version;
+}
+
+static char PowerOff_charging_FW_version[] = "0001";
+
+char * get_PowerOff_charging_version(void)
+{
+	return PowerOff_charging_FW_version;
+}
+
+extern char * get_FuelGauge_drv_version(void);
+extern char * get_battery_cfg_version(void);
+
+static char CH_drv_version[] = "0001.0001.0001.0001";
+static ssize_t CHDrvVersion_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	sprintf(CH_drv_version, "%s.%s.%s.%s", get_FuelGauge_drv_version(), get_battery_cfg_version(), get_charger_drv_version(), get_PowerOff_charging_version());
+	printk("CH_drv_version = %s\n" , CH_drv_version);
+	return sprintf(buf, "%s\n", CH_drv_version);
+}
+
+static DEVICE_ATTR(CHDrvVersion, 0644, CHDrvVersion_show , NULL);
+
+static struct attribute *pm8226_chger_attrs[] = {
+	&dev_attr_CHDrvVersion.attr,
+	NULL
+};
+
+static const struct attribute_group pm8226_chger_attr_group = {
+	.attrs = pm8226_chger_attrs,
+};
+
+/* [CCI] E- Bug# Jonny_Chan*/
+
 static int __devinit
 qpnp_charger_probe(struct spmi_device *spmi)
 {
@@ -5216,6 +5856,11 @@ qpnp_charger_probe(struct spmi_device *spmi)
 
 	chip->prev_usb_max_ma = -EINVAL;
 	chip->fake_battery_soc = -EINVAL;
+	/*[Bug464] S Jonny_Chan */
+	chip->tchg_count = 0;
+	chip->tchg_remain_mins = 0;
+	chip->prev_chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
+	/*[Bug464] E Jonny_Chan */	
 	chip->dev = &(spmi->dev);
 	chip->spmi = spmi;
 
@@ -5568,6 +6213,19 @@ qpnp_charger_probe(struct spmi_device *spmi)
 			qpnp_chg_is_dc_chg_plugged_in(chip),
 			get_prop_batt_present(chip),
 			get_prop_batt_health(chip));
+
+	/* [CCI] S- Bug#713 Jonny_Chan*/
+	rc = charger_battery_register(CHARGER_TEST, charger_callback, chip);
+	rc = charger_battery_register(BATTERY_TEST, battery_callback, chip);
+	/* [CCI] E- Bug#713 Jonny_Chan*/
+
+	/* [CCI] S- Bug# Jonny_Chan*/
+	rc = sysfs_create_group(&spmi->dev.kobj, &pm8226_chger_attr_group);
+	if (rc) {
+		printk("Unable to create sysfs entries\n");
+	}
+	/* [CCI] E- Bug# Jonny_Chan*/
+	
 	return 0;
 
 unregister_dc_psy:
@@ -5641,7 +6299,11 @@ static int qpnp_chg_suspend(struct device *dev)
 		rc = qpnp_chg_masked_write(chip,
 			chip->bat_if_base + BAT_IF_VREF_BAT_THM_CTRL,
 			VREF_BATT_THERM_FORCE_ON,
+#ifndef CONFIG_SONY_EAGLE
 			VREF_BAT_THM_ENABLED_FSM, 1);
+#else
+			VREF_BATT_THERM_FORCE_ON, 1);
+#endif
 		if (rc)
 			pr_debug("failed to set FSM VREF_BAT_THM rc=%d\n", rc);
 	}

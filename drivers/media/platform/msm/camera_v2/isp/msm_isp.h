@@ -67,7 +67,12 @@ enum msm_isp_camif_update_state {
 	NO_UPDATE,
 	ENABLE_CAMIF,
 	DISABLE_CAMIF,
+#ifndef CONFIG_SONY_EAGLE
 	DISABLE_CAMIF_IMMEDIATELY
+#else
+	DISABLE_CAMIF_IMMEDIATELY,
+	DISABLE_CAMIF_IMMEDIATELY_VFE_RECOVER
+#endif
 };
 
 enum msm_isp_reset_type {

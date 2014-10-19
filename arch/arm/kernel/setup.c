@@ -516,10 +516,22 @@ void __init dump_machine_table(void)
 		/* can't use cpu_relax() here as it may require MMU setup */;
 }
 
+//S, Ramdump
+#ifdef CCI_KLOG_ALLOW_FORCE_PANIC
+#define CCI_RAMDUMP_SIZE                                    (0x400000) //4M
+#define CCI_RAMDUMP_START_ADDR_PHYSICAL     (CCI_KLOG_START_ADDR_PHYSICAL - CCI_RAMDUMP_SIZE)  //0x5C00000
+#endif // #ifdef CCI_KLOG_ALLOW_FORCE_PANIC
+//E, Ramdump
+
 int __init arm_add_memory(phys_addr_t start, phys_addr_t size)
 {
 	struct membank *bank = &meminfo.bank[meminfo.nr_banks];
 
+//[VY5x] ==> CCI KLog, added by Jimmy@CCI
+#ifdef CONFIG_CCI_KLOG
+	printk("%s(%u):try start=0x%08llX, size=0x%08llX\n", __func__, meminfo.nr_banks, (long long)start, (long long)size);
+#endif // #ifdef CONFIG_CCI_KLOG
+//[VY5x] <== CCI KLog, added by Jimmy@CCI
 	if (meminfo.nr_banks >= NR_BANKS) {
 		printk(KERN_CRIT "NR_BANKS too low, "
 			"ignoring memory at 0x%08llx\n", (long long)start);
@@ -531,6 +543,33 @@ int __init arm_add_memory(phys_addr_t start, phys_addr_t size)
 	 * Size is appropriately rounded down, start is rounded up.
 	 */
 	size -= start & ~PAGE_MASK;
+//[VY5x] ==> CCI KLog, added by Jimmy@CCI
+#ifdef CONFIG_CCI_KLOG
+	if(start == (phys_addr_t)CCI_KLOG_START_ADDR_PHYSICAL)//top of a bank
+	{
+		start += CCI_KLOG_SIZE;
+		size -= CCI_KLOG_SIZE;
+	}
+	else if(start + size - (phys_addr_t)CCI_KLOG_SIZE == (phys_addr_t)CCI_KLOG_START_ADDR_PHYSICAL)//bottom of a bank
+	{
+		size -= CCI_KLOG_SIZE;
+	}
+
+//S, Ramdump
+#ifdef CCI_KLOG_ALLOW_FORCE_PANIC
+	if(start == (phys_addr_t)CCI_RAMDUMP_START_ADDR_PHYSICAL)//top of a bank
+	{
+		start += CCI_RAMDUMP_SIZE;
+		size -= CCI_RAMDUMP_SIZE;
+	}
+	else if(start + size - (phys_addr_t)CCI_RAMDUMP_SIZE == (phys_addr_t)CCI_RAMDUMP_START_ADDR_PHYSICAL)//bottom of a bank
+	{
+		size -= CCI_RAMDUMP_SIZE;
+	}
+#endif // #ifdef CCI_KLOG_ALLOW_FORCE_PANIC
+//E, Ramdump
+#endif // #ifdef CONFIG_CCI_KLOG
+//[VY5x] <== CCI KLog, added by Jimmy@CCI
 	bank->start = PAGE_ALIGN(start);
 
 #ifndef CONFIG_LPAE
@@ -548,6 +587,11 @@ int __init arm_add_memory(phys_addr_t start, phys_addr_t size)
 
 	bank->size = size & ~(phys_addr_t)(PAGE_SIZE - 1);
 
+//[VY5x] ==> CCI KLog, added by Jimmy@CCI
+#ifdef CONFIG_CCI_KLOG
+	printk("%s(%u):set start=0x%08llX, size=0x%08llX\n", __func__, meminfo.nr_banks, (long long)start, (long long)size);
+#endif // #ifdef CONFIG_CCI_KLOG
+//[VY5x] <== CCI KLog, added by Jimmy@CCI
 	/*
 	 * Check whether this memory region has non-zero size or
 	 * invalid node number.

@@ -211,10 +211,6 @@ Optional properties:
 				If this property is specified, then the quotient adjustment values are added to the target
 				quotient values read from fuses before writing them into the CPR GCNT target control registers.
 				This property can be used to add static margin to the voltage rail managed by the CPR controller.
-- vdd-apc-optional-prim-supply:	Present: Regulator of highest priority to supply VDD APC power
-				Not Present: No such regulator.
-- vdd-apc-optional-sec-supply:	Present: Regulator of second highest priority to supply VDD APC power.
-				Not Present: No such regulator.
 - qcom,cpr-speed-bin-max-corners: Array of quintuples in which each quintuple maps a CPU speed bin and PVS version to
 				the maximum virtual voltage corner corresponding to the SVS, NORMAL and TURBO corners.
 				The 5 elements in one quintuple are:

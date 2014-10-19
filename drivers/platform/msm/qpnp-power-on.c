@@ -23,6 +23,7 @@
 #include <linux/input.h>
 #include <linux/log2.h>
 #include <linux/qpnp/power-on.h>
+#include <linux/wakelock.h>/* KevinA_Lin, 20140205 */
 
 #define PMIC_VER_8941           0x01
 #define PMIC_VERSION_REG        0x0105
@@ -386,6 +387,70 @@ qpnp_get_cfg(struct qpnp_pon *pon, u32 pon_type)
 	return NULL;
 }
 
+/* KevinA_Lin, 20140205 */
+#ifdef CCI_FORCE_RAMDUMP
+#define CCI_FORCE_RAMDUMP_TIMEOUT 1000
+#define CCI_FORCE_RAMDUMP_CHECK_NUM 30
+static struct timer_list hwkey_timer;
+struct qpnp_pon *pon_ptr;
+static int hwkey_timer_check = 0;
+static struct wake_lock force_ramdump_wake_lock;
+static void
+qpnp_pon_force_ramdump_timer(unsigned long unused)
+{
+	int rc, del_rc;
+	u8 pon_rt_sts = 0;
+	
+	rc = spmi_ext_register_readl(pon_ptr->spmi->ctrl, pon_ptr->spmi->sid,
+			QPNP_PON_RT_STS(pon_ptr->base), &pon_rt_sts, 1);
+	if (rc) {
+		//SPMI read fail 
+		pr_info("%s(): Unable to read PON RT status\n", __func__);
+		hwkey_timer_check = 0;
+	} else {
+		//release power key
+		if (!pon_rt_sts & QPNP_PON_KPDPWR_N_SET) { 
+			del_rc = del_timer(&hwkey_timer);
+			hwkey_timer_check = 0;
+			pr_info("%s():release power key, hwkey_timer_check=%d, del_rc=%d\n", __func__, hwkey_timer_check, del_rc);
+		//keep pressing power key
+		} else {
+			hwkey_timer_check ++;
+			if(!(hwkey_timer_check%5)){
+					pr_info("%s():keep pressing power key, hwkey_timer_check=%d\n", __func__, hwkey_timer_check);
+				}
+			if(hwkey_timer_check == CCI_FORCE_RAMDUMP_CHECK_NUM) {
+				pr_info("%s: long press pwkey to  force panic!!!\n",__func__);
+				panic("kernel panic cause by long press pwkey!!!");
+			}
+			mod_timer(&hwkey_timer, jiffies + msecs_to_jiffies(CCI_FORCE_RAMDUMP_TIMEOUT));
+		}
+	}
+}
+static void
+qpnp_pon_force_ramdump_timer_start(void)
+{
+	wake_lock(&force_ramdump_wake_lock);
+	mod_timer(&hwkey_timer, jiffies + msecs_to_jiffies(CCI_FORCE_RAMDUMP_TIMEOUT)); // delay 30 seconds
+}
+static void
+qpnp_pon_force_ramdump(u8 pon_rt_val)
+{
+	int del_rc;
+	//release power key 
+	if (!pon_rt_val) {
+		del_rc = del_timer(&hwkey_timer);
+		hwkey_timer_check = 0; 
+		pr_info("%s():release power key, hwkey_timer_check=%d, del_rc =%d\n", __func__,  hwkey_timer_check, del_rc);
+		if(wake_lock_active(&force_ramdump_wake_lock))
+			wake_unlock(&force_ramdump_wake_lock);
+	} else {//press power key 
+		qpnp_pon_force_ramdump_timer_start();
+	}
+}
+#endif
+/* KevinA_Lin, 20140205 */
+
 static int
 qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
 {
@@ -428,6 +493,13 @@ qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
 
 	input_report_key(pon->pon_input, cfg->key_code,
 					(pon_rt_sts & pon_rt_bit));
+	/* KevinA_Lin, 20140205 */
+	#ifdef CCI_FORCE_RAMDUMP
+	if (cfg->pon_type == PON_KPDPWR)
+		qpnp_pon_force_ramdump(pon_rt_sts & pon_rt_bit);
+	#endif
+	/* KevinA_Lin, 20140205 */
+
 	input_sync(pon->pon_input);
 
 	return 0;
@@ -1102,6 +1174,9 @@ free_input_dev:
 	return rc;
 }
 
+//quiet reboot
+extern void set_quiet_reboot_flag(void);
+
 static int __devinit qpnp_pon_probe(struct spmi_device *spmi)
 {
 	struct qpnp_pon *pon;
@@ -1194,6 +1269,13 @@ static int __devinit qpnp_pon_probe(struct spmi_device *spmi)
 				pon->spmi->sid,
 				qpnp_poff_reason[index]);
 
+	//quiet reboot
+	if( index - 1 == 1 ) //"Triggered from SMPL (sudden momentary power loss)"
+	{
+		set_quiet_reboot_flag();
+	}
+	//quiet reboot
+
 	rc = of_property_read_u32(pon->spmi->dev.of_node,
 				"qcom,pon-dbc-delay", &delay);
 	if (rc) {
@@ -1270,6 +1352,16 @@ static int __devinit qpnp_pon_probe(struct spmi_device *spmi)
 	dev_set_drvdata(&spmi->dev, pon);
 
 	INIT_DELAYED_WORK(&pon->bark_work, bark_work_func);
+
+	/* KevinA_Lin, 20140205 */
+	#ifdef CCI_FORCE_RAMDUMP
+	wake_lock_init(&force_ramdump_wake_lock, WAKE_LOCK_SUSPEND,
+			"qpnp-force-ramedump");
+	setup_timer(&hwkey_timer,
+			qpnp_pon_force_ramdump_timer, (unsigned long)0);
+	pon_ptr = pon;
+	#endif
+	/* KevinA_Lin, 20140205 */
 
 	/* register the PON configurations */
 	rc = qpnp_pon_config_init(pon);

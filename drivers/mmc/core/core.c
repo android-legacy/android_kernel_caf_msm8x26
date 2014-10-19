@@ -2848,6 +2848,10 @@ static void mmc_clk_scale_work(struct work_struct *work)
 	mmc_clk_scaling(host, true);
 	mmc_release_host(host);
 out:
+	if (host->card == NULL) {
+	    pr_err("%s: Card is null\n", __func__);
+	    return;
+	}
 	mmc_rpm_release(host, &host->card->dev);
 	return;
 }

@@ -31,6 +31,11 @@
 #include <asm/hardware/gic.h>
 #include <mach/msm_iomap.h>
 #include <mach/rpm.h>
+//[VY5x] ==> CCI KLog, added by Jimmy@CCI
+#ifdef CONFIG_CCI_KLOG
+#include <linux/cciklog.h>
+#endif // #ifdef CONFIG_CCI_KLOG
+//[VY5x] <== CCI KLog, added by Jimmy@CCI
 
 /******************************************************************************
  * Data type and structure definitions
@@ -946,6 +951,11 @@ static irqreturn_t msm_pm_rpm_wakeup_interrupt(int irq, void *dev_id)
 int __init msm_rpm_init(struct msm_rpm_platform_data *data)
 {
 	int rc;
+//[VY5x] ==> CCI KLog, added by Jimmy@CCI
+#ifdef CONFIG_CCI_KLOG_RECORD_RPM_VERSION
+	char rpm_version[KLOG_RPM_VERSION_LENGTH] = {0};
+#endif // #ifdef CONFIG_CCI_KLOG_RECORD_RPM_VERSION
+//[VY5x] <== CCI KLog, added by Jimmy@CCI
 
 	memcpy(&msm_rpm_data, data, sizeof(struct msm_rpm_platform_data));
 	msm_rpm_sel_mask_size = msm_rpm_data.sel_last / 32 + 1;
@@ -957,6 +967,12 @@ int __init msm_rpm_init(struct msm_rpm_platform_data *data)
 				target_status(MSM_RPM_STATUS_ID_VERSION_MINOR));
 	fw_build = msm_rpm_read(MSM_RPM_PAGE_STATUS,
 				target_status(MSM_RPM_STATUS_ID_VERSION_BUILD));
+//[VY5x] ==> CCI KLog, added by Jimmy@CCI
+#ifdef CONFIG_CCI_KLOG_RECORD_RPM_VERSION
+	snprintf(rpm_version, KLOG_RPM_VERSION_LENGTH - 1, "%u.%u.%u", fw_major, fw_minor, fw_build);
+	klog_record_rpm_version(rpm_version);
+#endif // #ifdef CONFIG_CCI_KLOG_RECORD_RPM_VERSION
+//[VY5x] <== CCI KLog, added by Jimmy@CCI
 	pr_info("%s: RPM firmware %u.%u.%u\n", __func__,
 			fw_major, fw_minor, fw_build);
 

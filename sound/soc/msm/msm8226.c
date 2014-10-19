@@ -27,7 +27,7 @@
 #include <asm/mach-types.h>
 #include <mach/socinfo.h>
 #include <mach/subsystem_notif.h>
-#include <qdsp6v2/msm-pcm-routing-v2.h>
+#include "qdsp6v2/msm-pcm-routing-v2.h"
 #include "qdsp6v2/q6core.h"
 #include "../codecs/wcd9xxx-common.h"
 #include "../codecs/wcd9306.h"
@@ -1092,6 +1092,7 @@ void *def_tapan_mbhc_cal(void)
 	btn_low = wcd9xxx_mbhc_cal_btn_det_mp(btn_cfg, MBHC_BTN_DET_V_BTN_LOW);
 	btn_high = wcd9xxx_mbhc_cal_btn_det_mp(btn_cfg,
 					       MBHC_BTN_DET_V_BTN_HIGH);
+	#if 0  // BAM_S C 130811 B160 B2123
 	btn_low[0] = -50;
 	btn_high[0] = 20;
 	btn_low[1] = 21;
@@ -1108,6 +1109,24 @@ void *def_tapan_mbhc_cal(void)
 	btn_high[6] = 269;
 	btn_low[7] = 270;
 	btn_high[7] = 500;
+	#else
+	btn_low[0] = -50;
+	btn_high[0] = 99;
+	btn_low[1] = 100;
+	btn_high[1] = 299;
+	btn_low[2] = 300;
+	btn_high[2] = 599;
+	btn_low[3] = 600;
+	btn_high[3] = 1049;
+	btn_low[4] = 1050;
+	btn_high[4] = 1099;
+	btn_low[5] = 1100;
+	btn_high[5] = 1149;
+	btn_low[6] = 1150;
+	btn_high[6] = 1199;
+	btn_low[7] = 1200;
+	btn_high[7] = 1299;
+	#endif  // BAM_E C 130811
 	n_ready = wcd9xxx_mbhc_cal_btn_det_mp(btn_cfg, MBHC_BTN_DET_N_READY);
 	n_ready[0] = 80;
 	n_ready[1] = 12;

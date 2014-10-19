@@ -939,8 +939,30 @@ static int get_simultaneous_batt_v_and_i(struct qpnp_bms_chip *chip,
 	return 0;
 }
 
+#ifdef CONFIG_SONY_EAGLE
 static int get_rbatt(struct qpnp_bms_chip *chip,
-					int soc_rbatt_mohm, int batt_temp)
+ 									int soc_rbatt_mohm, int batt_temp)
+{
+	int rbatt_mohm, scalefactor;
+
+	rbatt_mohm = chip->default_rbatt_mohm;
+ 	if (chip->rbatt_sf_lut == NULL) {
+ 		pr_debug("RBATT = %d\n", rbatt_mohm);
+ 		return rbatt_mohm;
+ 	}
+ 	/* Convert the batt_temp to DegC from deciDegC */
+ 	scalefactor = interpolate_scalingfactor(chip->rbatt_sf_lut,
+ 										batt_temp, soc_rbatt_mohm);
+	rbatt_mohm = (rbatt_mohm * scalefactor) / 100;
+
+	rbatt_mohm += chip->r_conn_mohm;
+ 	rbatt_mohm += chip->rbatt_capacitive_mohm;
+ 	return rbatt_mohm;
+}
+#endif
+
+#ifndef CONFIG_SONY_EAGLE
+static int estimate_ocv(struct qpnp_bms_chip *chip)
 {
 	int rbatt_mohm, scalefactor;
 
@@ -976,6 +998,29 @@ static int estimate_ocv(struct qpnp_bms_chip *chip, int batt_temp)
 			ocv_est_uv, vbat_uv, ibat_ua, rbatt_mohm);
 	return ocv_est_uv;
 }
+#else
+#define DEFAULT_RBATT_SOC 50
+static int estimate_ocv(struct qpnp_bms_chip *chip, int batt_temp) 
+{
+	int ibat_ua, vbat_uv, ocv_est_uv, rbatt_mohm, rc;
+
+	rbatt_mohm = get_rbatt(chip, DEFAULT_RBATT_SOC, batt_temp);
+
+	rc = get_simultaneous_batt_v_and_i(chip, &ibat_ua, &vbat_uv);
+	if (rc) {
+		pr_err("simultaneous failed rc = %d\n", rc);
+		return rc;
+	}
+
+	ocv_est_uv = vbat_uv + (ibat_ua * rbatt_mohm) / 1000;
+
+	pr_debug("estimated pon ocv = %d, vbat_uv = %d ibat_ua = %d rbatt_mohm = %d\n",
+					ocv_est_uv, vbat_uv, ibat_ua, rbatt_mohm);
+	
+	return ocv_est_uv;
+	
+}
+#endif
 
 #define MIN_IAVG_MA 250
 static void reset_for_new_battery(struct qpnp_bms_chip *chip, int batt_temp)
@@ -1145,10 +1190,12 @@ static int read_soc_params_raw(struct qpnp_bms_chip *chip,
 	pr_debug("cc_raw= 0x%llx\n", raw->cc);
 	return 0;
 
+#ifdef CONFIG_SONY_EAGLE
 param_err:
 	unlock_output_data(chip);
 	mutex_unlock(&chip->bms_output_lock);
 	return rc;
+#endif
 }
 
 static int calculate_pc(struct qpnp_bms_chip *chip, int ocv_uv,
@@ -1268,6 +1315,30 @@ static int calculate_cc(struct qpnp_bms_chip *chip, int64_t cc,
 		return *software_counter + cc_uah;
 	}
 }
+
+#ifndef CONFIG_SONY_EAGLE
+static int get_rbatt(struct qpnp_bms_chip *chip,
+					int soc_rbatt_mohm, int batt_temp)
+{
+	int rbatt_mohm, scalefactor;
+
+	rbatt_mohm = chip->default_rbatt_mohm;
+	if (chip->rbatt_sf_lut == NULL)  {
+		pr_debug("RBATT = %d\n", rbatt_mohm);
+		return rbatt_mohm;
+	}
+	/* Convert the batt_temp to DegC from deciDegC */
+	batt_temp = batt_temp / 10;
+	scalefactor = interpolate_scalingfactor(chip->rbatt_sf_lut,
+						batt_temp, soc_rbatt_mohm);
+	rbatt_mohm = (rbatt_mohm * scalefactor) / 100;
+
+	rbatt_mohm += chip->r_conn_mohm;
+	rbatt_mohm += chip->rbatt_capacitive_mohm;
+	return rbatt_mohm;
+}
+#endif
+/*[CCI] E- Bug#2723 SR patches Jonny_Chan*/
 
 #define IAVG_MINIMAL_TIME	2
 static void calculate_iavg(struct qpnp_bms_chip *chip, int cc_uah,
@@ -4218,7 +4289,14 @@ static int setup_die_temp_monitoring(struct qpnp_bms_chip *chip)
 	pr_debug("setup complete\n");
 	return 0;
 }
+/* [CCI] S- Bug# Jonny_Chan*/
+static char FuelGauge_drv_FW_version[] = "0001";
 
+char * get_FuelGauge_drv_version(void)
+{
+	return FuelGauge_drv_FW_version;
+}
+/* [CCI] E- Bug# Jonny_Chan*/
 static int __devinit qpnp_bms_probe(struct spmi_device *spmi)
 {
 	struct qpnp_bms_chip *chip;

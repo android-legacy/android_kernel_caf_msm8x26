@@ -101,6 +101,18 @@
 #define MSM_RPM_MPM_BASE	IOMEM(0xFA802000)	/*  4K	*/
 #define MSM_AD5_BASE		IOMEM(0xFA900000)	/*  13M (D00000)
 							  0xFB600000 */
+//[YV5x] ==> CCI KLog, added by Jimmy@CCI
+#ifdef CONFIG_CCI_KLOG
+#define MSM_KLOG_BASE		IOMEM(0xFB600000)
+#define MSM_KLOG_SIZE		CCI_KLOG_SIZE
+
+//S, Ramdump
+#ifdef CCI_KLOG_ALLOW_FORCE_PANIC
+#define MSM_RAMDUMP_BASE		IOMEM(0xFB600000 + CCI_KLOG_SIZE)
+#endif //#ifdef CCI_KLOG_ALLOW_FORCE_PANIC
+//E, Ramdump
+#endif // #ifdef CONFIG_CCI_KLOG
+//[VY5x] <== CCI KLog, added by Jimmy@CCI
 /* MSM9625 has unaligned imem so we need to map excess 2K virtually
  * to get the correct mapping. This should not be done for any
  * other chipset under normal circumstances.

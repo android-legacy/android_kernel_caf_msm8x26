@@ -182,7 +182,7 @@ struct cpr_regulator {
 	int			vdd_mx_vmin_method;
 	int			vdd_mx_vmin;
 	int			vdd_mx_corner_map[CPR_FUSE_CORNER_MAX];
-
+	
 	/* mem-acc regulator */
 	struct regulator	*mem_acc_vreg;
 
