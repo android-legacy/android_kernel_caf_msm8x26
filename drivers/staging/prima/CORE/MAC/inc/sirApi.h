@@ -467,15 +467,6 @@ typedef struct sSirRemainOnChnReq
     tANI_U8  probeRspIe[1];
 }tSirRemainOnChnReq, *tpSirRemainOnChnReq;
 
-/* Structure for vendor specific IE of debug marker frame
-   to debug remain on channel issues */
-typedef struct publicVendorSpecific
-{
-    tANI_U8 category;
-    tANI_U8 elementid;
-    tANI_U8 length;
-} publicVendorSpecific;
-
 typedef struct sSirRegisterMgmtFrame
 {
     tANI_U16 messageType;
@@ -4150,6 +4141,16 @@ typedef struct sSirTdlsDelAllPeerInd
    tANI_U16               length;
    tANI_U8                sessionId;     // Session ID
 } tSirTdlsDelAllPeerInd, *tpSirTdlsDelAllPeerInd;
+#ifdef FEATURE_WLAN_TDLS_OXYGEN_DISAPPEAR_AP
+typedef struct sSirTdlsDisappearAPInd
+{
+   tANI_U16               messageType;
+   tANI_U16               length;
+   tANI_U8                sessionId;     // Session ID
+   tANI_U16               staId;
+   tSirMacAddr            staAddr;
+} tSirTdlsDisappearAPInd, *tpSirTdlsDisappearAPInd;
+#endif
 typedef struct sSirMgmtTxCompletionInd
 {
    tANI_U16               messageType;
@@ -4614,22 +4615,5 @@ typedef struct sSirChAvoidIndType
    tSirChAvoidFreqType avoidFreqRange[SIR_CH_AVOID_MAX_RANGE];
 } tSirChAvoidIndType;
 #endif /* FEATURE_WLAN_CH_AVOID */
-
-typedef void (*pGetBcnMissRateCB)( tANI_S32 bcnMissRate,
-                                   VOS_STATUS status, void *data);
-
-typedef PACKED_PRE struct PACKED_POST
-{
-   tANI_U32   msgLen;
-   tANI_U8    bssid[WNI_CFG_BSSID_LEN];
-   void      *callback;
-   void      *data;
-}tSirBcnMissRateReq;
-
-typedef PACKED_PRE struct PACKED_POST
-{
-    pGetBcnMissRateCB callback;
-    void             *data;
-}tSirBcnMissRateInfo;
 
 #endif /* __SIR_API_H */
