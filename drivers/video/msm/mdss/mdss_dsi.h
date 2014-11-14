@@ -321,6 +321,11 @@ struct dsi_status_data {
 	struct notifier_block fb_notifier;
 	struct delayed_work check_status;
 	struct msm_fb_data_type *mfd;
+#ifdef CONFIG_MACH_SONY_FLAMINGO
+/*[Flamingo] LCM driver porting */
+	struct regulator *vdd_io_vreg;
+	struct regulator *vdda_vreg;
+#endif	
 };
 
 int dsi_panel_device_register(struct device_node *pan_node,

@@ -53,6 +53,7 @@
 
 #include "mdss_fb.h"
 #include "mdss_mdp_splash_logo.h"
+#include <linux/gpio.h> 
 
 #ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
 #define MDSS_FB_NUM 3
@@ -478,6 +479,23 @@ static int mdss_fb_lpm_enable(struct msm_fb_data_type *mfd, int mode)
 
 	return 0;
 }
+#ifdef CONFIG_MACH_SONY_FLAMINGO
+/* [Flamingo] Read LCM ID info. for ATS */
+#define LCM_ID_PIN	27
+extern char temp_buf[];		
+static ssize_t mdss_fb_lcm_module_id(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	ssize_t ret = 0;
+
+	if (*temp_buf != '\0')
+		ret = snprintf(buf, PAGE_SIZE, temp_buf);
+	else
+		ret = snprintf(buf, PAGE_SIZE, "TRULY\n");
+
+	return ret;
+}
+#endif
 
 static DEVICE_ATTR(msm_fb_type, S_IRUGO, mdss_fb_get_type, NULL);
 static DEVICE_ATTR(msm_fb_split, S_IRUGO, mdss_fb_get_split, NULL);
@@ -486,6 +504,10 @@ static DEVICE_ATTR(idle_time, S_IRUGO | S_IWUSR | S_IWGRP,
 	mdss_fb_get_idle_time, mdss_fb_set_idle_time);
 static DEVICE_ATTR(idle_notify, S_IRUGO, mdss_fb_get_idle_notify, NULL);
 static DEVICE_ATTR(msm_fb_panel_info, S_IRUGO, mdss_fb_get_panel_info, NULL);
+#ifdef CONFIG_MACH_SONY_FLAMINGO
+/*[Flamingo] Read LCM ID for ATS */
+static DEVICE_ATTR(lcm_module_id, S_IRUGO, mdss_fb_lcm_module_id, NULL);
+#endif
 
 static struct attribute *mdss_fb_attrs[] = {
 	&dev_attr_msm_fb_type.attr,
@@ -494,6 +516,10 @@ static struct attribute *mdss_fb_attrs[] = {
 	&dev_attr_idle_time.attr,
 	&dev_attr_idle_notify.attr,
 	&dev_attr_msm_fb_panel_info.attr,
+#ifdef CONFIG_MACH_SONY_FLAMINGO
+/*[Flamingo] Read LCM ID for ATS */
+	&dev_attr_lcm_module_id.attr,
+#endif
 	NULL,
 };
 
