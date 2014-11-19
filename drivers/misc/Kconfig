@@ -654,6 +654,10 @@ config USB_HSIC_SMSC_HUB
 	  This adds support for connecting devices like mouse in HSIC
 	  Host mode.
 
+config NXP_NFC_PN547
+	tristate "NFC PN547 Driver"
+	default n
+
 config TI_DRV2667
 	tristate "TI's DRV2667 haptic controller support"
 	depends on I2C
