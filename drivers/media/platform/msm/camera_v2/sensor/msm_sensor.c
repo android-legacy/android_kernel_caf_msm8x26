@@ -20,6 +20,15 @@
 #include <mach/rpm-regulator-smd.h>
 #include <linux/regulator/consumer.h>
 
+#ifdef CONFIG_MACH_SONY_FLAMINGO
+// [Flamingo] Modify for Camera Second source
+uint16_t s5k5e2_version = 0;
+int powerup_count = 0;
+#endif
+#ifdef CONFIG_MACH_SONY_EAGLE
+#include "eeprom/msm_eeprom.h"
+#endif
+
 #undef CDBG
 #ifdef CONFIG_MSMB_CAMERA_DEBUG
 #define CDBG(fmt, args...) pr_err(fmt, ##args)
@@ -733,6 +742,25 @@ static int32_t msm_sensor_get_dt_data(struct device_node *of_node,
 		pr_err("%s failed %d\n", __func__, __LINE__);
 		goto ERROR1;
 	}
+#ifdef CONFIG_MACH_SONY_EAGLE
+	if(strcmp("imx134",s_ctrl->sensordata->sensor_name)==0) {
+		CDBG("%s:Main camera source no. is : %d\n", __func__,
+			cci_camera_source);
+		if(cci_camera_source == 1) {
+			s_ctrl->sensordata->sensor_name = "imx134_Sony";
+			CDBG("This is original source camera module-SONY\n");
+		}
+		else if(cci_camera_source == 2) {
+			s_ctrl->sensordata->sensor_name = "imx134li_QC";
+			CDBG("This is second source camera module-LiteON\n");
+		}
+		else {
+			pr_err("%s Invalid camera source number:%d\n", __func__,cci_camera_source);
+		}
+	}
+	pr_err("%s:[Mark] sensor-name: %s\n", __func__,
+			s_ctrl->sensordata->sensor_name);
+#endif
 
 	rc = of_property_read_u32(of_node, "qcom,sensor-mode",
 		&sensordata->sensor_init_params->modes_supported);
@@ -1144,6 +1172,9 @@ power_up_failed:
 int32_t msm_sensor_power_down(struct msm_sensor_ctrl_t *s_ctrl)
 {
 	int32_t index = 0;
+#ifdef CONFIG_MACH_SONY_EAGLE
+	int32_t gpiotestnum = 0;
+#endif
 	struct msm_sensor_power_setting_array *power_setting_array = NULL;
 	struct msm_sensor_power_setting *power_setting = NULL;
 	struct msm_camera_sensor_board_info *data = s_ctrl->sensordata;
@@ -1177,9 +1208,20 @@ int32_t msm_sensor_power_down(struct msm_sensor_ctrl_t *s_ctrl)
 					SENSOR_GPIO_MAX);
 				continue;
 			}
+#ifdef CONFIG_MACH_SONY_EAGLE
+			gpiotestnum = data->gpio_conf->gpio_num_info->gpio_num
+					[power_setting->seq_val];
+			if((gpiotestnum == 69) && (gpio69_count == 2)){
+				CDBG("[VY5X][CTS]Avoid sub camera preview fail in CTS\n");
+			}
+			else {
+#endif
 			gpio_set_value_cansleep(
 				data->gpio_conf->gpio_num_info->gpio_num
 				[power_setting->seq_val], GPIOF_OUT_INIT_LOW);
+#ifdef CONFIG_MACH_SONY_EAGLE
+			}
+#endif
 			break;
 		case SENSOR_VREG:
 			if (power_setting->seq_val >= CAM_VREG_MAX) {
@@ -1800,6 +1842,62 @@ static struct msm_camera_i2c_fn_t msm_sensor_qup_func_tbl = {
 	.i2c_write_conf_tbl = msm_camera_qup_i2c_write_conf_tbl,
 };
 
+#ifdef CONFIG_MACH_SONY_EAGLE
+static ssize_t CheckCameraID_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+  uint16_t rc;
+  uint16_t chipid = 0;
+
+  struct msm_sensor_ctrl_t *s_ctrl = (struct msm_sensor_ctrl_t *)dev->driver->of_match_table->data;
+
+  CDBG("[Vince Debug] Enter Ping Function \t%s:%d \n", __func__, __LINE__);//CDBG
+
+  if(s_ctrl)
+  {
+      //CDBG("[Vince Debug] s_ctrl get -start power up %s:%d \n", __func__, __LINE__);
+      rc= s_ctrl->func_tbl->sensor_power_up(s_ctrl);
+      if (rc < 0)
+      {
+          pr_err("%s %s power up failed\n", __func__,
+          s_ctrl->sensordata->sensor_name);
+          pr_err("[Vince Debug] power up fail %s:%d \n", __func__, __LINE__);
+          return sprintf(buf, "ID: error 0x03 \n");
+      }
+      //CDBG("[Vince Debug] power up okay - start i2c tranfer %s:%d \n", __func__, __LINE__);
+      if(strcmp("SKUAA_ST_gc0339",s_ctrl->sensordata->sensor_name))
+      {//for general
+          rc = s_ctrl->sensor_i2c_client->i2c_func_tbl->i2c_read(
+          s_ctrl->sensor_i2c_client,
+          s_ctrl->sensordata->slave_info->sensor_id_reg_addr,
+          &chipid, MSM_CAMERA_I2C_WORD_DATA);
+      }
+      else
+      {//for gc0339
+          rc = s_ctrl->sensor_i2c_client->i2c_func_tbl->i2c_read(
+          s_ctrl->sensor_i2c_client,
+          s_ctrl->sensordata->slave_info->sensor_id_reg_addr,
+          &chipid, MSM_CAMERA_I2C_BYTE_DATA);
+      }
+      if (rc < 0)
+      {
+          s_ctrl->func_tbl->sensor_power_down(s_ctrl);
+          pr_err("%s: %s: read id failed\n", __func__,s_ctrl->sensordata->sensor_name);
+          return sprintf(buf, "ID: error 0x01 \n");
+      }
+      //CDBG("[Vince Debug] check id okay -start power dwon %s:%d \n", __func__, __LINE__);
+      s_ctrl->func_tbl->sensor_power_down(s_ctrl);
+  }
+  else
+  {
+      pr_err("[Vince Debug] s_ctrl get fail %s:%d \n", __func__, __LINE__);
+      return sprintf(buf, "ID: error 0x02 \n");
+  }
+  CDBG("[Vince Debug] Exit Ping function \t%s:%d \n", __func__, __LINE__);
+  return sprintf(buf, "ID: 0x%x\n", chipid);
+}
+static DEVICE_ATTR(CheckCameraID, S_IRUSR | S_IWUSR, CheckCameraID_show, NULL);
+#endif
+
 int32_t msm_sensor_platform_probe(struct platform_device *pdev, void *data)
 {
 	int32_t rc = 0;
@@ -1860,6 +1958,41 @@ int32_t msm_sensor_platform_probe(struct platform_device *pdev, void *data)
 		return rc;
 	}
 
+#ifdef CONFIG_MACH_SONY_FLAMINGO
+//[Flamingo] Modify for Camera Second source
+	rc = strcmp(s_ctrl->sensordata->sensor_name,"s5k5e2");
+	if (rc == 0) {
+		rc = s_ctrl->sensor_i2c_client->i2c_func_tbl->i2c_write_conf_tbl(
+							s_ctrl->sensor_i2c_client,
+							s5k5e2_read_eeprom,
+							ARRAY_SIZE(s5k5e2_read_eeprom), MSM_CAMERA_I2C_BYTE_DATA);
+		msleep(5);
+		rc = s_ctrl->sensor_i2c_client->i2c_func_tbl->i2c_read(
+					s_ctrl->sensor_i2c_client,
+					0x0A06,
+					&s5k5e2_version, MSM_CAMERA_I2C_BYTE_DATA);
+		pr_err("%s: camera s5k5e2_version = 0x%x\n", __func__,s5k5e2_version);
+	}
+	v4l2_subdev_init(&s_ctrl->msm_sd.sd,
+		s_ctrl->sensor_v4l2_subdev_ops);
+	if (s5k5e2_version == 0x16) {
+		snprintf(s_ctrl->msm_sd.sd.name,
+			sizeof(s_ctrl->msm_sd.sd.name), "%s",
+			s_ctrl->sensordata->sensor_name);
+		snprintf(s_ctrl->sensordata->sensor_info->sensor_name,
+			sizeof(s_ctrl->sensordata->sensor_info->sensor_name), "%s_chicony",
+			s_ctrl->sensordata->sensor_name);
+	} else {
+		snprintf(s_ctrl->msm_sd.sd.name,
+			sizeof(s_ctrl->msm_sd.sd.name), "%s",
+			s_ctrl->sensordata->sensor_name);
+		snprintf(s_ctrl->sensordata->sensor_info->sensor_name,
+			sizeof(s_ctrl->sensordata->sensor_info->sensor_name), "%s",
+			s_ctrl->sensordata->sensor_name);
+	}
+	pr_info("%s: %s probe succeeded\n", __func__,
+		s_ctrl->sensordata->sensor_info->sensor_name);
+#else
 	CDBG("%s %s probe succeeded\n", __func__,
 		s_ctrl->sensordata->sensor_name);
 	v4l2_subdev_init(&s_ctrl->msm_sd.sd,
@@ -1867,6 +2000,7 @@ int32_t msm_sensor_platform_probe(struct platform_device *pdev, void *data)
 	snprintf(s_ctrl->msm_sd.sd.name,
 		sizeof(s_ctrl->msm_sd.sd.name), "%s",
 		s_ctrl->sensordata->sensor_name);
+#endif
 	v4l2_set_subdevdata(&s_ctrl->msm_sd.sd, pdev);
 	s_ctrl->msm_sd.sd.flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
 	media_entity_init(&s_ctrl->msm_sd.sd.entity, 0, NULL, 0);
@@ -1889,6 +2023,15 @@ int32_t msm_sensor_platform_probe(struct platform_device *pdev, void *data)
 
 	s_ctrl->func_tbl->sensor_power_down(s_ctrl);
 	CDBG("%s:%d\n", __func__, __LINE__);
+#ifdef CONFIG_MACH_SONY_EAGLE
+  CDBG("[Vince Debug] Pin Function create Function Enter\t%s:%d\n", __func__, __LINE__);
+  {
+      if(device_create_file(s_ctrl->dev, &dev_attr_CheckCameraID))
+      {
+          pr_err("[Vince Debug] Ping Function create fail!!\t%s:%d\n", __func__, __LINE__);
+      }
+  }
+#endif
 	return rc;
 }
 
