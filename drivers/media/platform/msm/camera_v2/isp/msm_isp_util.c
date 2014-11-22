@@ -25,8 +25,13 @@
 static DEFINE_MUTEX(bandwidth_mgr_mutex);
 static struct msm_isp_bandwidth_mgr isp_bandwidth_mgr;
 
+#ifndef CONFIG_SONY_EAGLE
 #define MSM_ISP_MIN_AB 300000000
 #define MSM_ISP_MIN_IB 450000000
+#else
+#define MSM_ISP_MIN_AB 450000000
+#define MSM_ISP_MIN_IB 900000000
+#endif
 
 #define VFE40_8974V2_VERSION 0x1001001A
 static struct msm_bus_vectors msm_isp_init_vectors[] = {
@@ -1051,7 +1056,11 @@ static inline void msm_isp_process_overflow_irq(
 			&vfe_dev->error_info.overflow_recover_irq_mask1);
 		/*Stop CAMIF Immediately*/
 		vfe_dev->hw_info->vfe_ops.core_ops.
+#ifndef CONFIG_SONY_EAGLE
 			update_camif_state(vfe_dev, DISABLE_CAMIF_IMMEDIATELY);
+#else
+			update_camif_state(vfe_dev, DISABLE_CAMIF_IMMEDIATELY_VFE_RECOVER);
+#endif
 		/*Halt the hardware & Clear all other IRQ mask*/
 		vfe_dev->hw_info->vfe_ops.axi_ops.halt(vfe_dev, 0);
 		/*Update overflow state*/
@@ -1304,7 +1313,9 @@ int msm_isp_open_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 	memset(&vfe_dev->axi_data, 0, sizeof(struct msm_vfe_axi_shared_data));
 	memset(&vfe_dev->stats_data, 0,
 		sizeof(struct msm_vfe_stats_shared_data));
+#ifndef CONFIG_SONY_EAGLE
 	memset(&vfe_dev->error_info, 0, sizeof(vfe_dev->error_info));
+#endif
 	vfe_dev->axi_data.hw_info = vfe_dev->hw_info->axi_hw_info;
 	vfe_dev->vfe_open_cnt++;
 	vfe_dev->taskletq_idx = 0;
