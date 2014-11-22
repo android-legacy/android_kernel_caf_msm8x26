@@ -1931,9 +1931,6 @@ static struct clk_freq_tbl ftbl_camss_gp0_1_clk[] = {
 	F_MMSS(     10000,         xo,  16,    1,  120),
 	F_MMSS(     24000,         xo,  16,    1,   50),
 	F_MMSS(   6000000,      gpll0,  10,    1,   10),
-#if defined(CONFIG_SONY_CAM_V4L2)
-	F_MMSS(   8000000,      gpll0,  15,    1,    5),
-#endif
 	F_MMSS(  12000000,      gpll0,  10,    1,    5),
 	F_MMSS(  13000000,      gpll0,   4,   13,  150),
 	F_MMSS(  24000000,      gpll0,   5,    1,    5),

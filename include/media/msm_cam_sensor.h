@@ -264,9 +264,6 @@ struct msm_camera_i2c_seq_reg_setting {
 	uint16_t size;
 	enum msm_camera_i2c_reg_addr_type addr_type;
 	uint16_t delay;
-#ifdef CONFIG_SONY_CAM_V4L2
-	uint16_t slave_addr;
-#endif
 };
 
 struct msm_camera_i2c_array_write_config {
@@ -422,9 +419,6 @@ enum msm_sensor_cfg_type_t {
 	CFG_WRITE_I2C_ARRAY,
 	CFG_SLAVE_WRITE_I2C_ARRAY,
 	CFG_WRITE_I2C_SEQ_ARRAY,
-#ifdef CONFIG_SONY_CAM_V4L2
-	CFG_WRITE_I2C_SEQ_ARRAY_WITH_SID,
-#endif
 	CFG_POWER_UP,
 	CFG_POWER_DOWN,
 	CFG_SET_STOP_STREAM_SETTING,
@@ -545,9 +539,6 @@ enum af_camera_name {
 	ACTUATOR_MAIN_CAM_3,
 	ACTUATOR_MAIN_CAM_4,
 	ACTUATOR_MAIN_CAM_5,
-#if defined(CONFIG_MACH_SONY_FLAMINGO) || defined(CONFIG_MACH_SONY_EAGLE)
-	ACTUATOR_MAIN_CAM_6,
-#endif
 	ACTUATOR_WEB_CAM_0,
 	ACTUATOR_WEB_CAM_1,
 	ACTUATOR_WEB_CAM_2,

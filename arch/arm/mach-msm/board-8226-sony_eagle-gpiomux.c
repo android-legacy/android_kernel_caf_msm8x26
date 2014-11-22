@@ -949,10 +949,6 @@ void __init msm8226_init_gpiomux(void)
 		return;
 	}
 
-#if defined(CONFIG_SONY_CAM_V4L2)
-	msm_tlmm_misc_reg_write(TLMM_SPARE_REG, 0x5);
-#endif
-
 #if defined(CONFIG_KS8851) || defined(CONFIG_KS8851_MODULE)
 	msm_gpiomux_install(msm_eth_configs, ARRAY_SIZE(msm_eth_configs));
 #endif
