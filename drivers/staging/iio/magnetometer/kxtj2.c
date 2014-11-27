@@ -435,7 +435,7 @@ yas_measure(struct yas_data *raw, int num)
 
 		if(			(abs(dat[0]) < Detection_range)  
 				&&	(abs(dat[1]) < Detection_range)	
-				&&	(abs((abs(dat[2])- Sensitivity_def))  < ((Detection_range)+ 154)))		// 154 = 1024*15% 
+				&&	(abs((abs(dat[2])- Sensitivity_def))  < (553)))		// 553 = 1024*54%// 154 = 1024*15% 
 		  {
 			//printk("KXTJ2 Calibration Raw Data,%d,%d,%d\n",raw[0],raw[1],raw[2]);
 			
@@ -468,7 +468,7 @@ yas_measure(struct yas_data *raw, int num)
 				//printk("KXTJ2 start Z compensation Z_AVG Max Min,%d,%d,%d\n",(temp_zsum / BUF_RANGE),Wave_Max,Wave_Min);
 			}
 		}
-		//else if(abs((abs(dat[2])- Sensitivity_def))  > ((Detection_range)+ 154))
+		//else if(abs((abs(dat[2])- Sensitivity_def))  > (553))
 		//{
 		//	printk("KXTJ2 out of SPEC Raw Data,%d,%d,%d\n",dat[0],dat[1],dat[2]);
 		//}
