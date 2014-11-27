@@ -197,7 +197,11 @@
 	#define STK_HT_N_CT	130
 	//STK add for CCI start 20130112
 	#define MAX_COMPARE(a,b) (a>b)? a:b
-	
+
+	//To avoid Auto Calibration CT is too big - 20140805
+	#define MIN_COMPARE(a,b) (a<b)? a:b
+	//
+
 	unsigned int cci_ps_high_thd;
 	unsigned int cci_ps_low_thd;
 	//STK add for CCI end 20130112	
@@ -910,7 +914,7 @@ static int32_t stk3x1x_enable_ps(struct stk3x1x_data *ps_data, uint8_t enable)
 		//}
 		//else
 		//{	
-			printk(KERN_ERR "%s: [CCI] use STK default value\n", __func__);
+			printk(KERN_ERR "%s: use Auto calibration value: hang_up_hthd = %d, hang_up_lthd = %d\n", __func__, hang_up_hthd, hang_up_lthd);
 			ps_data->ps_thd_h = hang_up_hthd;
 			ps_data->ps_thd_l = hang_up_lthd;
 		//}
@@ -919,18 +923,18 @@ static int32_t stk3x1x_enable_ps(struct stk3x1x_data *ps_data, uint8_t enable)
 	{
 		if((2*cci_result_ct+(cci_ps_high_thd-cci_result_ct)) > hang_up_hthd)
 		{
-			printk(KERN_ERR "%s: [CCI] use CCI calibration value: cci_ps_high_thd = %d, cci_ps_low_thd = %d\n", __func__, cci_ps_high_thd, cci_ps_low_thd);
+			printk(KERN_ERR "%s: use CCI calibration value: cci_ps_high_thd = %d, cci_ps_low_thd = %d\n", __func__, cci_ps_high_thd, cci_ps_low_thd);
 			ps_data->ps_thd_h = 2*cci_result_ct + (cci_ps_high_thd-cci_result_ct);
 			ps_data->ps_thd_l = 2*cci_result_ct + (cci_ps_low_thd-cci_result_ct);
 		}
 		else
 		{
-			printk(KERN_ERR "%s: [CCI] use CCI calibration value: cci_ps_high_thd = %d, cci_ps_low_thd = %d\n", __func__, cci_ps_high_thd, cci_ps_low_thd);
+			printk(KERN_ERR "%s: use Auto calibration value: hang_up_hthd = %d, hang_up_lthd = %d\n", __func__, hang_up_hthd, hang_up_lthd);
 			ps_data->ps_thd_h = hang_up_hthd;
 			ps_data->ps_thd_l = hang_up_lthd;
 		}
 	}
-	printk(KERN_ERR "%s: [CCI] write H/L thd when ps disable: ps_thd_h = %d, ps_thd_l = %d\n", __func__, ps_data->ps_thd_h, ps_data->ps_thd_l);
+	printk(KERN_ERR "%s: write H/L thd when ps disable: ps_thd_h = %d, ps_thd_l = %d\n", __func__, ps_data->ps_thd_h, ps_data->ps_thd_l);
 	stk3x1x_set_ps_thd_h(ps_data, ps_data->ps_thd_h);
 	stk3x1x_set_ps_thd_l(ps_data, ps_data->ps_thd_l);	
 	//STK add for CCI end 20130430 dust issue for variation in 2 consequential calls 
@@ -2460,6 +2464,10 @@ static int stk_ps_tune_zero_func_fae(struct stk3x1x_data *ps_data)
 	int ret, diff;
 	unsigned char value[2];
 
+	//To avoid Auto Calibration CT is too big - 20140805
+	uint16_t MAX_CT;
+	//
+
 	//STK add for CCI start 20130430 dust issue for variation in 2 consequential calls start
 	static int32_t temp_max_min_diff = 0;
 	//STK add for CCI start 20130430 dust issue for variation in 2 consequential calls end
@@ -2530,6 +2538,22 @@ static int stk_ps_tune_zero_func_fae(struct stk3x1x_data *ps_data)
 		//STK add for CCI start 20130112
 		ps_data->psi_set = MAX_COMPARE(ps_data->psi_set, cci_result_ct);
 		//STK add for CCI end 20130112
+
+		//To avoid Auto Calibration CT is too big - 20140805
+		if(cci_ps_cover!=0 && cci_result_ct!=0){
+			//printk(KERN_INFO "%s:============START CHECK IF CT IS TOO BIG============\n", __func__);
+			printk(KERN_INFO "%s:MAX Compare cci_ps_cover(%d) and 2*CT(%d)\n", __func__, cci_ps_cover, 2*cci_result_ct);
+			MAX_CT = MAX_COMPARE(cci_ps_cover, 2*cci_result_ct);
+			printk(KERN_INFO "%s:MAX_CT = %d\n",  __func__, MAX_CT);
+
+			printk(KERN_INFO "%s:MIN Compare psi_set(%d) and MAX_CT(%d)\n", __func__, ps_data->psi_set, MAX_CT);
+			ps_data->psi_set = MIN_COMPARE(ps_data->psi_set, MAX_CT);
+			printk(KERN_INFO "%s:The Result CT: psi_set = %d\n", __func__, ps_data->psi_set);
+			//printk(KERN_INFO "%s:=========================END========================\n", __func__);
+		}
+		else
+			printk(KERN_ERR "%s: NO cci_ps_cover and cci_result_ct data!!\n", __func__);
+		//
 		
 		//STK add for CCI start 20130112
 		if(cci_ps_low_thd==0 || cci_ps_high_thd==0)
@@ -2656,7 +2680,7 @@ static void stk_ps_poll_work_func(struct work_struct *work)
 	struct stk3x1x_data *ps_data = container_of(work, struct stk3x1x_data, stk_ps_work);	
 	uint32_t reading;
 	int32_t near_far_state;
-    uint8_t org_flag_reg;	
+    int32_t org_flag_reg;	
 	int32_t ret;
     uint8_t disable_flag = 0;
 
@@ -2714,7 +2738,7 @@ static void stk_work_func(struct work_struct *work)
 #if ((STK_INT_PS_MODE != 0x03) && (STK_INT_PS_MODE != 0x02))
     int32_t ret;
     uint8_t disable_flag = 0;
-    uint8_t org_flag_reg;
+    int32_t org_flag_reg;
 #endif	/* #if ((STK_INT_PS_MODE != 0x03) && (STK_INT_PS_MODE != 0x02)) */
 
 #ifndef CONFIG_STK_PS_ALS_USE_CHANGE_THRESHOLD	
@@ -2835,6 +2859,7 @@ static void stk_work_func(struct work_struct *work)
 	return;
 
 err_i2c_rw:
+	printk(KERN_ERR "%s:i2c error, wait 30 ms then retry\n", __func__);
 	msleep(30);
 	enable_irq(ps_data->irq);
 	return;	
