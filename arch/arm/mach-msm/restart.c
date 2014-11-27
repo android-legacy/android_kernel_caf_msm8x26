@@ -374,10 +374,6 @@ static void msm_restart_prepare(const char *cmd)
 	}
 #endif		
 
-#ifdef CONFIG_CCI_KLOG	
-	*unknowflag = 0;
-	*backupcrashflag = 0;
-#endif
 
 #ifdef CONFIG_MSM_DLOAD_MODE
 
@@ -388,31 +384,13 @@ static void msm_restart_prepare(const char *cmd)
 	set_dload_mode(in_panic);
 	if(in_panic)
 	{
-#ifdef CCI_KLOG_ALLOW_FORCE_PANIC			
-		__raw_writel(CONFIG_WARMBOOT_CRASH, restart_reason);
-#else
 		__raw_writel(CONFIG_WARMBOOT_NORMAL, restart_reason);
-#ifdef CONFIG_CCI_KLOG
-		*backupcrashflag = CONFIG_WARMBOOT_CRASH;
-#endif
-#endif	
 		abnormalflag = ABNORAML_CRASH;
 		mb();
 	}
 	/* Write download mode flags if restart_mode says so */
 	if (restart_mode == RESTART_DLOAD)
-//[VY5x] ==> CCI KLog, modified by Jimmy@CCI
-#ifdef CONFIG_CCI_KLOG
-	{
-		cklc_save_magic(KLOG_MAGIC_DOWNLOAD_MODE, KLOG_STATE_DOWNLOAD_MODE);
 		set_dload_mode(1);
-		__raw_writel(CONFIG_WARMBOOT_S1 , restart_reason);		
-		mb();
-	}
-#else // #ifdef CONFIG_CCI_KLOG
-		set_dload_mode(1);
-#endif // #ifdef CONFIG_CCI_KLOG
-//[VY5x] <== CCI KLog, modified by Jimmy@CCI
 
 	/* Kill download mode if master-kill switch is set */
 	if (!download_mode)
@@ -422,157 +400,28 @@ static void msm_restart_prepare(const char *cmd)
 	pm8xxx_reset_pwr_off(1);
 
 	/* Hard reset the PMIC unless memory contents must be maintained. */
-#if 0	
 	if (get_dload_mode() || (cmd != NULL && cmd[0] != '\0'))
-#else
-	if (get_dload_mode() || (cmd != NULL))
-#endif	
 		qpnp_pon_system_pwr_off(PON_POWER_OFF_WARM_RESET);
 	else
 		qpnp_pon_system_pwr_off(PON_POWER_OFF_HARD_RESET);
 
 	if (cmd != NULL) {
 		if (!strncmp(cmd, "bootloader", 10)) {
-//[VY5x] ==> CCI KLog, modified by Jimmy@CCI
-#ifdef CONFIG_CCI_KLOG
-			cklc_save_magic(KLOG_MAGIC_BOOTLOADER, KLOG_STATE_NONE);
-#endif // #ifdef CONFIG_CCI_KLOG
-//[VY5x] <== CCI KLog, modified by Jimmy@CCI
-			__raw_writel(CONFIG_WARMBOOT_FB, restart_reason);
-			mb();
+			__raw_writel(0x77665500, restart_reason);
 		} else if (!strncmp(cmd, "recovery", 8)) {
-//[VY5x] ==> CCI KLog, modified by Jimmy@CCI
-#ifdef CONFIG_CCI_KLOG
-			cklc_save_magic(KLOG_MAGIC_RECOVERY, KLOG_STATE_NONE);
-#endif // #ifdef CONFIG_CCI_KLOG
-//[VY5x] <== CCI KLog, modified by Jimmy@CCI
-			__raw_writel(CONFIG_WARMBOOT_NORMAL, restart_reason);
-			__raw_writel(0x59564352, CCI_RCOVRY_ON_FLAG_ADDR); /*YVCR*/
-			mb();
-//Joker mark for fix merge conflict, may need to fix
-//			__raw_writel(0x77665502, restart_reason);
-//		} else if (!strcmp(cmd, "rtc")) {
-//			__raw_writel(0x77665503, restart_reason);
-//Joker mark for fix merge conflict, may need to fix
+			__raw_writel(0x77665502, restart_reason);
+		} else if (!strcmp(cmd, "rtc")) {
+			__raw_writel(0x77665503, restart_reason);
 		} else if (!strncmp(cmd, "oem-", 4)) {
 			unsigned long code;
 			code = simple_strtoul(cmd + 4, NULL, 16) & 0xff;
-//[VY5x] ==> CCI KLog, modified by Jimmy@CCI
-#ifdef CONFIG_CCI_KLOG
-			snprintf(buf, KLOG_MAGIC_LENGTH + 1, "%s%lX", KLOG_MAGIC_OEM_COMMAND, code);
-			kprintk("OEM command:code=%lX, buf=%s\n", code, buf);
-#ifdef CCI_KLOG_ALLOW_FORCE_PANIC
-			switch(code)
-			{
-				case 0x60 + KLOG_INDEX_INIT % 0x10://0x60, simulate klog init magic
-					cklc_save_magic(KLOG_MAGIC_INIT, KLOG_STATE_NONE);
-					break;
-
-				case 0x60 + KLOG_INDEX_MARM_FATAL % 0x10://0x61, simulate mARM fatal magic
-					cklc_save_magic(KLOG_MAGIC_AARM_PANIC, KLOG_STATE_NONE);
-					break;
-
-				case 0x60 + KLOG_INDEX_AARM_PANIC % 0x10://0x62, simulate aARM panic magic
-					cklc_save_magic(KLOG_MAGIC_AARM_PANIC, KLOG_STATE_NONE);
-					break;
-
-				case 0x60 + KLOG_INDEX_RPM_CRASH % 0x10://0x63, simulate RPM crash magic
-					cklc_save_magic(KLOG_MAGIC_RPM_CRASH, KLOG_STATE_NONE);
-					break;
-
-				case 0x60 + KLOG_INDEX_SUBSYS_CRASH % 0x10://0x64, simulate sub-system crash magic
-					cklc_save_magic(KLOG_MAGIC_SUBSYS_CRASH, KLOG_STATE_NONE);
-					break;
-
-				case 0x60 + KLOG_INDEX_FIQ_HANG % 0x10://0x65, simulate FIQ hang magic
-					cklc_save_magic(KLOG_MAGIC_FIQ_HANG, KLOG_STATE_NONE);
-					break;
-
-				case 0x60 + KLOG_INDEX_UNKNOWN_CRASH % 0x10://0x66, simulate unknown crash magic
-					cklc_save_magic(KLOG_MAGIC_UNKNOWN_CRASH, KLOG_STATE_NONE);
-					break;
-
-				case 0x60 + KLOG_INDEX_DOWNLOAD_MODE % 0x10://0x67, simulate normal download mode magic
-					cklc_save_magic(KLOG_MAGIC_DOWNLOAD_MODE, KLOG_STATE_NONE);
-					break;
-
-				case 0x60 + KLOG_INDEX_POWER_OFF % 0x10://0x68, simulate power off magic
-					cklc_save_magic(KLOG_MAGIC_POWER_OFF, KLOG_STATE_NONE);
-					break;
-
-				case 0x60 + KLOG_INDEX_REBOOT % 0x10://0x69, simulate normal reboot magic
-					cklc_save_magic(KLOG_MAGIC_REBOOT, KLOG_STATE_NONE);
-					break;
-
-				case 0x60 + KLOG_INDEX_BOOTLOADER % 0x10://0x6A, simulate bootloader mode magic
-					cklc_save_magic(KLOG_MAGIC_BOOTLOADER, KLOG_STATE_NONE);
-					break;
-
-				case 0x60 + KLOG_INDEX_RECOVERY % 0x10://0x6B, simulate recovery mode magic
-					cklc_save_magic(KLOG_MAGIC_RECOVERY, KLOG_STATE_NONE);
-					break;
-
-				case 0x60 + KLOG_INDEX_OEM_COMMAND % 0x10://0x6C, simulate oem-command magic with OEM-6C
-					cklc_save_magic(KLOG_MAGIC_OEM_COMMAND"6C", KLOG_STATE_NONE);
-					break;
-
-				case 0x60 + KLOG_INDEX_APPSBL % 0x10://0x6D, simulate AppSBL magic
-					cklc_save_magic(KLOG_MAGIC_APPSBL, KLOG_STATE_NONE);
-					break;
-
-				case 0x60 + KLOG_INDEX_FORCE_CLEAR % 0x10://0x6F, simulate force clear magic
-					cklc_save_magic(KLOG_MAGIC_FORCE_CLEAR, KLOG_STATE_NONE);
-					break;
-
-				default:
-					cklc_save_magic(buf, KLOG_STATE_NONE);
-					break;
-			}
-#else // #ifdef CCI_KLOG_ALLOW_FORCE_PANIC
-			cklc_save_magic(buf, KLOG_STATE_NONE);
-#endif // #ifdef CCI_KLOG_ALLOW_FORCE_PANIC
-#endif // #ifdef CONFIG_CCI_KLOG
-//[VY5x] <== CCI KLog, modified by Jimmy@CCI
-			__raw_writel(CONFIG_WARMBOOT_NORMAL, restart_reason);
-			mb();
+			__raw_writel(0x6f656d00 | code, restart_reason);
 		} else if (!strncmp(cmd, "edl", 3)) {
 			enable_emergency_dload_mode();
-		} 
-		else if (!strncmp(cmd, "oemS", 4)) {
-			__raw_writel(CONFIG_WARMBOOT_S1, restart_reason);
-			mb();
-		}
-		else if (!strncmp(cmd, "oemF", 4)) {
-			__raw_writel(CONFIG_WARMBOOT_FOTA, restart_reason);
-			mb();
-		} 
-		else if (!strncmp(cmd, "hard", 4)) {
-			pr_warn("pmic is running on hardreset, it will starting from cold boot\n");
-			qpnp_pon_system_pwr_off(PON_POWER_OFF_HARD_RESET);
-			__raw_writel(CONFIG_WARMBOOT_NORMAL, restart_reason);
-			mb();
-		} 
-		else{
-			__raw_writel(CONFIG_WARMBOOT_NORMAL, restart_reason);
-			mb();
-//[VY5x] ==> CCI KLog, modified by Jimmy@CCI
-#ifdef CONFIG_CCI_KLOG
-			cklc_save_magic(KLOG_MAGIC_REBOOT, KLOG_STATE_NONE);
-#endif // #ifdef CONFIG_CCI_KLOG
-//[VY5x] <== CCI KLog, modified by Jimmy@CCI
+		} else {
+			__raw_writel(0x77665501, restart_reason);
 		}
 	}
-//[VY5x] ==> CCI KLog, modified by Jimmy@CCI
-#ifdef CONFIG_CCI_KLOG
-	else
-	{
-		__raw_writel(CONFIG_WARMBOOT_NORMAL , restart_reason);		
-		mb();
-		pr_warn("pmic is running on hardreset, it will starting from cold boot\n");
-			cklc_save_magic(KLOG_MAGIC_REBOOT, KLOG_STATE_NONE);
-	}
-#endif // #ifdef CONFIG_CCI_KLOG
-//[VY5x] <== CCI KLog, modified by Jimmy@CCI
 
 	flush_cache_all();
 	outer_flush_all();
