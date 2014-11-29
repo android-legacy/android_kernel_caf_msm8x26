@@ -287,7 +287,6 @@
 		/* cci,enable_gpio = <62>; */
 		cci,control_gpio = <0>;
 	};
-
 };
 
 &usb_otg {
@@ -439,8 +438,8 @@
 						00];
 				qcom,use-blink;
 			};
-
 		};
+
 		qcom,power-on@800 {
 			qcom,pon_2 {
 				linux,code = <115>;
