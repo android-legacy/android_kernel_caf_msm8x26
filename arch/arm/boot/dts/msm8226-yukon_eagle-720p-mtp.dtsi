@@ -138,21 +138,11 @@
 			vdd-supply = <&pm8226_l19>;
 			vddio-supply = <&pm8226_lvs1>;
 		};
-		sensortek@48 {
-			compatible = "sensortek,stk3x1x";
+		stk_ps@48 {
+			compatible = "qcom,stk_ps";
 			reg = <0x48>;
-			stkvdd-supply = <&pm8226_l19>;
-			sensortek,vdd-current-level = <1 120>;
-			sensortek,slave-addr = <0x48>;
-			sensortek,int_pin = <&msmgpio 65 0x00>;
-			sensortek,state_reg = <0x0>;
-			sensortek,psctrl_reg = <0x33>;
-			sensortek,alsctrl_reg = <0x39>;
-			sensortek,ledctrl_reg = <0xFF>;
-			sensortek,wait_reg = <0x9>;
-			sensortek,ps_thd_h = <0x6A4>;//1700
-			sensortek,ps_thd_l = <0x5DC>;//1500
-			sensortek,transmittance = <0x458>;//1112
+			vdd_ana-supply = <&pm8226_l19>;
+			vcc_i2c-supply = <&pm8226_lvs1>;
 		};
 	};
 
