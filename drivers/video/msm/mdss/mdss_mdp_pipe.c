@@ -28,6 +28,12 @@
 
 #define PIPE_HALT_TIMEOUT_US	0x4000
 
+/* following offsets are relative to ctrl register bit offset */
+#define CLK_FORCE_ON_OFFSET	0x0
+#define CLK_FORCE_OFF_OFFSET	0x1
+/* following offsets are relative to status register bit offset */
+#define CLK_STATUS_OFFSET	0x0
+
 #ifdef CONFIG_MACH_SONY_EAGLE
 extern int g_mdss_dsi_lcd_id;
 #endif
