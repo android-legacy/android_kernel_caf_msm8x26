@@ -197,49 +197,6 @@ static int mdss_fb_notify_update(struct msm_fb_data_type *mfd,
 	return ret;
 }
 
-#ifndef CONFIG_FB_MSM_MDSS_PANEL_SPECIFIC
-static int mdss_fb_splash_thread(void *data)
-{
-	struct msm_fb_data_type *mfd = data;
-	int ret = -EINVAL;
-	struct fb_info *fbi = NULL;
-	int ov_index[2];
-
-	if (!mfd || !mfd->fbi || !mfd->mdp.splash_fnc) {
-		pr_err("Invalid input parameter\n");
-		goto end;
-	}
-
-	fbi = mfd->fbi;
-
-	ret = mdss_fb_open(fbi, current->tgid);
-	if (ret) {
-		pr_err("fb_open failed\n");
-		goto end;
-	}
-
-	mfd->bl_updated = true;
-	mdss_fb_set_backlight(mfd, mfd->panel_info->bl_max >> 1);
-
-	ret = mfd->mdp.splash_fnc(mfd, ov_index, MDP_CREATE_SPLASH_OV);
-	if (ret) {
-		pr_err("Splash image failed\n");
-		goto splash_err;
-	}
-
-	do {
-		schedule_timeout_interruptible(SPLASH_THREAD_WAIT_TIMEOUT * HZ);
-	} while (!kthread_should_stop());
-
-	mfd->mdp.splash_fnc(mfd, ov_index, MDP_REMOVE_SPLASH_OV);
-
-splash_err:
-	mdss_fb_release(fbi, current->tgid);
-end:
-	return ret;
-}
-#endif	/* CONFIG_FB_MSM_MDSS_PANEL_SPECIFIC */
-
 static int lcd_backlight_registered;
 
 static void mdss_fb_set_bl_brightness(struct led_classdev *led_cdev,
@@ -365,6 +322,62 @@ static ssize_t mdss_mdp_show_blank_event(struct device *dev,
 	pr_debug("fb%d panel_power_on = %d\n", mfd->index, mfd->panel_power_on);
 	ret = scnprintf(buf, PAGE_SIZE, "panel_power_on = %d\n",
 						mfd->panel_power_on);
+
+	return ret;
+}
+
+static void __mdss_fb_idle_notify_work(struct work_struct *work)
+{
+	struct delayed_work *dw = to_delayed_work(work);
+	struct msm_fb_data_type *mfd = container_of(dw, struct msm_fb_data_type,
+		idle_notify_work);
+
+	/* Notify idle-ness here */
+	pr_debug("Idle timeout %dms expired!\n", mfd->idle_time);
+	sysfs_notify(&mfd->fbi->dev->kobj, NULL, "idle_notify");
+}
+
+static ssize_t mdss_fb_get_idle_time(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct fb_info *fbi = dev_get_drvdata(dev);
+	struct msm_fb_data_type *mfd = fbi->par;
+	int ret;
+
+	ret = scnprintf(buf, PAGE_SIZE, "%d", mfd->idle_time);
+
+	return ret;
+}
+
+static ssize_t mdss_fb_set_idle_time(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct fb_info *fbi = dev_get_drvdata(dev);
+	struct msm_fb_data_type *mfd = fbi->par;
+	int rc = 0;
+	int idle_time = 0;
+
+	rc = kstrtoint(buf, 10, &idle_time);
+	if (rc) {
+		pr_err("kstrtoint failed. rc=%d\n", rc);
+		return rc;
+	}
+
+	pr_debug("Idle time = %d\n", idle_time);
+	mfd->idle_time = idle_time;
+
+	return count;
+}
+
+static ssize_t mdss_fb_get_idle_notify(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct fb_info *fbi = dev_get_drvdata(dev);
+	struct msm_fb_data_type *mfd = fbi->par;
+	int ret;
+
+	ret = scnprintf(buf, PAGE_SIZE, "%s",
+		work_busy(&mfd->idle_notify_work.work) ? "no" : "yes");
 
 	return ret;
 }
@@ -691,10 +704,12 @@ static int mdss_fb_remove(struct platform_device *pdev)
 	if (mfd->key != MFD_KEY)
 		return -EINVAL;
 
+#ifndef CONFIG_MACH_SONY_EAGLE
 #ifdef CONFIG_DEBUG_FS
 	if ((mfd->panel_info->type == MIPI_VIDEO_PANEL) ||
 		(mfd->panel_info->type == MIPI_CMD_PANEL))
 		mipi_dsi_panel_remove_debugfs(mfd);
+#endif
 #endif
 
 	if (mdss_fb_suspend_sub(mfd))
