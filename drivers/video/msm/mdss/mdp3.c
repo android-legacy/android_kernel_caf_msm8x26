@@ -738,9 +738,11 @@ int mdp3_iommu_attach(int context)
 	if (context >= MDP3_IOMMU_CTX_MAX)
 		return -EINVAL;
 
+	mutex_lock(&mdp3_res->iommu_lock);
 	context_map = mdp3_res->iommu_contexts + context;
 	if (context_map->attached) {
 		pr_warn("mdp iommu already attached\n");
+		mutex_unlock(&mdp3_res->iommu_lock);
 		return 0;
 	}
 
@@ -749,6 +751,7 @@ int mdp3_iommu_attach(int context)
 	iommu_attach_device(domain_map->domain, context_map->ctx);
 
 	context_map->attached = true;
+	mutex_unlock(&mdp3_res->iommu_lock);
 	return 0;
 }
 
@@ -761,9 +764,11 @@ int mdp3_iommu_dettach(int context)
 		context >= MDP3_IOMMU_CTX_MAX)
 		return -EINVAL;
 
+	mutex_lock(&mdp3_res->iommu_lock);
 	context_map = mdp3_res->iommu_contexts + context;
 	if (!context_map->attached) {
 		pr_warn("mdp iommu not attached\n");
+		mutex_unlock(&mdp3_res->iommu_lock);
 		return 0;
 	}
 
@@ -771,6 +776,7 @@ int mdp3_iommu_dettach(int context)
 	iommu_detach_device(domain_map->domain, context_map->ctx);
 	context_map->attached = false;
 
+	mutex_unlock(&mdp3_res->iommu_lock);
 	return 0;
 }
 
@@ -2266,6 +2272,7 @@ static int mdp3_probe(struct platform_device *pdev)
 	.panel_register_done = mdp3_panel_register_done,
 	.fb_stride = mdp3_fb_stride,
 	.fb_mem_alloc_fnc = mdp3_alloc,
+	.check_dsi_status = mdp3_check_dsi_ctrl_status,
 	};
 
 	struct mdp3_intr_cb underrun_cb = {
@@ -2366,7 +2373,7 @@ int mdp3_panel_get_boot_cfg(void)
 
 	if (!mdp3_res || !mdp3_res->pan_cfg.init_done)
 		rc = -EPROBE_DEFER;
-	if (mdp3_res->pan_cfg.lk_cfg)
+	else if (mdp3_res->pan_cfg.lk_cfg)
 		rc = 1;
 	else
 		rc = 0;

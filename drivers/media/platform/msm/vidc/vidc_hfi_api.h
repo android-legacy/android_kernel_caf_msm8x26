@@ -63,7 +63,7 @@ enum vidc_status {
 	VIDC_ERR_BAD_HANDLE,
 	VIDC_ERR_NOT_SUPPORTED,
 	VIDC_ERR_BAD_STATE,
-	VIDC_ERR_MAX_CLIENT,
+	VIDC_ERR_MAX_CLIENTS,
 	VIDC_ERR_IFRAME_EXPECTED,
 	VIDC_ERR_HW_FATAL,
 	VIDC_ERR_BITSTREAM_ERR,
@@ -91,8 +91,6 @@ enum hal_extradata_id {
 	HAL_EXTRADATA_FRAME_RATE,
 	HAL_EXTRADATA_PANSCAN_WINDOW,
 	HAL_EXTRADATA_RECOVERY_POINT_SEI,
-	HAL_EXTRADATA_CLOSED_CAPTION_UD,
-	HAL_EXTRADATA_AFD_UD,
 	HAL_EXTRADATA_MULTISLICE_INFO,
 	HAL_EXTRADATA_INDEX,
 	HAL_EXTRADATA_NUM_CONCEALED_MB,
@@ -103,6 +101,7 @@ enum hal_extradata_id {
 	HAL_EXTRADATA_FRAME_BITS_INFO,
 	HAL_EXTRADATA_LTR_INFO,
 	HAL_EXTRADATA_METADATA_MBI,
+	HAL_EXTRADATA_STREAM_USERDATA,
 };
 
 enum hal_property {
@@ -1157,9 +1156,6 @@ struct hfi_device {
 			enum session_type type, enum mem_type mtype);
 	int (*unvote_bus)(void *dev, enum session_type type,
 		enum mem_type mtype);
-	int (*unset_ocmem)(void *dev);
-	int (*alloc_ocmem)(void *dev, unsigned long size);
-	int (*free_ocmem)(void *dev);
 	int (*iommu_get_domain_partition)(void *dev, u32 flags, u32 buffer_type,
 			int *domain_num, int *partition_num);
 	int (*load_fw)(void *dev);
@@ -1172,6 +1168,7 @@ struct hfi_device {
 	int (*session_clean)(void *sess);
 	int (*get_core_capabilities)(void);
 	int (*power_enable)(void *dev);
+	int (*suspend)(void *dev);
 };
 
 typedef void (*hfi_cmd_response_callback) (enum command_response cmd,
