@@ -391,6 +391,9 @@ end:
 
 static int mdss_mdp_display_splash_image(struct msm_fb_data_type *mfd)
 {
+#if (defined(CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL) && defined(CONFIG_MACH_SONY_YUKON))
+	return 0;
+#endif
 	int rc = 0;
 	struct fb_info *fbi;
 	uint32_t image_len = SPLASH_IMAGE_WIDTH * SPLASH_IMAGE_HEIGHT
