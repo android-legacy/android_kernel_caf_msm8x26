@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -57,9 +57,7 @@ static struct msm_gpiomux_config msm_hsic_configs[] = {
 };
 #endif
 
-#define KS8851_IRQ_GPIO 115
-
-//S:EllenLu 20130709 ,[LED]add for SOMC Illumination
+#ifdef CONFIG_MACH_SONY_EAGLE
 static struct gpiomux_setting led_det_actv_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_2MA,
@@ -82,7 +80,92 @@ static struct msm_gpiomux_config msm8226_led_det_configs[] __initdata = {
 		},
 	},
 };
-//E:EllenLu 20130709 ,[LED]add for SOMC Illumination
+
+static struct gpiomux_setting uim1_det_actv_cfg = {
+	.func = GPIOMUX_FUNC_1,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_UP,
+	.dir = GPIOMUX_IN,
+};
+static struct gpiomux_setting uim1_det_susp_cfg = {
+	.func = GPIOMUX_FUNC_1,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_NONE,
+	.dir = GPIOMUX_IN,
+};
+
+#ifdef CCI_SIM_DET_EAGLE_DS
+static struct gpiomux_setting uim2_det_actv_cfg = {
+	.func = GPIOMUX_FUNC_1,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_UP,
+	.dir = GPIOMUX_IN,
+};
+static struct gpiomux_setting uim2_det_susp_cfg = {
+	.func = GPIOMUX_FUNC_1,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_NONE,
+	.dir = GPIOMUX_IN,
+};
+#endif
+
+static struct msm_gpiomux_config msm8226_uim_det_configs[] __initdata = {
+	{
+		.gpio      = 60,
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &uim1_det_actv_cfg,
+			[GPIOMUX_SUSPENDED] = &uim1_det_susp_cfg,
+		},
+	},
+#ifdef CCI_SIM_DET_EAGLE_DS
+	{
+		.gpio      = 56,
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &uim2_det_actv_cfg,
+			[GPIOMUX_SUSPENDED] = &uim2_det_susp_cfg,
+		},
+	},
+#endif
+};
+#endif
+
+static struct gpiomux_setting smsc_hub_act_cfg = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_8MA,
+	.pull = GPIOMUX_PULL_NONE,
+};
+
+static struct gpiomux_setting smsc_hub_susp_cfg = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_NONE,
+};
+
+static struct msm_gpiomux_config smsc_hub_configs[] = {
+	{
+		.gpio = 114, /* reset_n */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &smsc_hub_act_cfg,
+			[GPIOMUX_SUSPENDED] = &smsc_hub_susp_cfg,
+		},
+	},
+	{
+		.gpio = 8, /* clk_en */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &smsc_hub_act_cfg,
+			[GPIOMUX_SUSPENDED] = &smsc_hub_susp_cfg,
+		},
+	},
+	{
+		.gpio = 9, /* int_n */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &smsc_hub_act_cfg,
+			[GPIOMUX_SUSPENDED] = &smsc_hub_susp_cfg,
+		},
+	},
+};
+
+#define KS8851_IRQ_GPIO 115
 
 #if defined(CONFIG_KS8851) || defined(CONFIG_KS8851_MODULE)
 static struct gpiomux_setting gpio_eth_config = {
@@ -101,32 +184,7 @@ static struct msm_gpiomux_config msm_eth_configs[] = {
 };
 #endif
 
-//S:LO
-static struct gpiomux_setting uim1_det_actv_cfg = {
-	.func = GPIOMUX_FUNC_1,
-	.drv = GPIOMUX_DRV_2MA,
-	.pull = GPIOMUX_PULL_UP,
-	.dir = GPIOMUX_IN,
-};
-static struct gpiomux_setting uim1_det_susp_cfg = {
-	.func = GPIOMUX_FUNC_1,
-	.drv = GPIOMUX_DRV_2MA,
-	.pull = GPIOMUX_PULL_NONE,
-	.dir = GPIOMUX_IN,
-};
-
-static struct msm_gpiomux_config msm8226_uim_det_configs[] __initdata = {
-	{
-		.gpio      = 60,
-		.settings = {
-			[GPIOMUX_ACTIVE]    = &uim1_det_actv_cfg,
-			[GPIOMUX_SUSPENDED] = &uim1_det_susp_cfg,
-		},
-	},
-};
-//E:LO
-
-/*[Bug911] S Jonny_Chan */
+#ifdef CONFIG_MACH_SONY_EAGLE
 static struct gpiomux_setting ovp_sus_config = {
 	.pull = GPIOMUX_PULL_NONE,
 	.drv = GPIOMUX_DRV_2MA,
@@ -138,11 +196,12 @@ static struct msm_gpiomux_config msm8226_ovp_configs[] = {
 	{
 		.gpio = 34,
 		.settings = {
-			[GPIOMUX_SUSPENDED] = &ovp_sus_config,
+		[GPIOMUX_SUSPENDED] = &ovp_sus_config,
 		}
 	},
 };
-/*[Bug911] E Jonny_Chan */
+#endif
+
 static struct gpiomux_setting synaptics_int_act_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_8MA,
@@ -167,6 +226,7 @@ static struct gpiomux_setting synaptics_reset_sus_cfg = {
 	.pull = GPIOMUX_PULL_DOWN,
 };
 
+#ifdef CONFIG_MACH_SONY_EAGLE
 static struct gpiomux_setting gpio_volume_keys_active = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_2MA,
@@ -177,6 +237,7 @@ static struct gpiomux_setting gpio_volume_keys_suspend = {
 	.drv = GPIOMUX_DRV_2MA,
 	.pull = GPIOMUX_PULL_UP,
 };
+#endif
 
 static struct gpiomux_setting gpio_keys_active = {
 	.func = GPIOMUX_FUNC_GPIO,
@@ -189,6 +250,31 @@ static struct gpiomux_setting gpio_keys_suspend = {
 	.drv = GPIOMUX_DRV_2MA,
 	.pull = GPIOMUX_PULL_NONE,
 };
+
+#ifndef CONFIG_MACH_SONY_EAGLE
+static struct gpiomux_setting gpio_spi_act_config = {
+	.func = GPIOMUX_FUNC_1,
+	.drv = GPIOMUX_DRV_8MA,
+	.pull = GPIOMUX_PULL_NONE,
+};
+
+static struct gpiomux_setting gpio_spi_cs_act_config = {
+	.func = GPIOMUX_FUNC_1,
+	.drv = GPIOMUX_DRV_6MA,
+	.pull = GPIOMUX_PULL_DOWN,
+};
+static struct gpiomux_setting gpio_spi_susp_config = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_DOWN,
+};
+
+static struct gpiomux_setting gpio_spi_cs_eth_config = {
+	.func = GPIOMUX_FUNC_4,
+	.drv = GPIOMUX_DRV_6MA,
+	.pull = GPIOMUX_PULL_DOWN,
+};
+#endif
 
 static struct gpiomux_setting wcnss_5wire_suspend_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
@@ -221,6 +307,15 @@ static struct gpiomux_setting gpio_i2c_config = {
 };
 
 static struct msm_gpiomux_config msm_keypad_configs[] __initdata = {
+#ifndef CONFIG_MACH_SONY_EAGLE
+	{
+		.gpio = 106,
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &gpio_keys_active,
+			[GPIOMUX_SUSPENDED] = &gpio_keys_suspend,
+		},
+	},
+#else
 	{
 		.gpio = 106,
 		.settings = {
@@ -235,6 +330,7 @@ static struct msm_gpiomux_config msm_keypad_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gpio_volume_keys_suspend,
 		},
 	},
+#endif
 	{
 		.gpio = 107,
 		.settings = {
@@ -282,6 +378,29 @@ static struct msm_gpiomux_config msm_lcd_configs[] __initdata = {
 };
 
 static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
+#ifndef CONFIG_MACH_SONY_EAGLE
+	{
+		.gpio      = 0,		/* BLSP1 QUP1 SPI_DATA_MOSI */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &gpio_spi_act_config,
+			[GPIOMUX_SUSPENDED] = &gpio_spi_susp_config,
+		},
+	},
+	{
+		.gpio      = 1,		/* BLSP1 QUP1 SPI_DATA_MISO */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &gpio_spi_act_config,
+			[GPIOMUX_SUSPENDED] = &gpio_spi_susp_config,
+		},
+	},
+	{
+		.gpio      = 3,		/* BLSP1 QUP1 SPI_CLK */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &gpio_spi_act_config,
+			[GPIOMUX_SUSPENDED] = &gpio_spi_susp_config,
+		},
+	},
+#endif
 	{
 		.gpio      = 14,	/* BLSP1 QUP4 I2C_SDA */
 		.settings = {
@@ -310,7 +429,14 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gpio_i2c_config,
 		},
 	},
-	/*CCI, IO Sensor - Add sensor I2C bus BLSP2 S*/
+#ifndef CONFIG_MACH_SONY_EAGLE
+	{
+		.gpio      = 22,		/* BLSP1 QUP1 SPI_CS_ETH */
+		.settings = {
+			[GPIOMUX_SUSPENDED] = &gpio_spi_cs_eth_config,
+		},
+	},
+#else
 	{
 		.gpio      = 6,		/* BLSP1 QUP2 I2C_SDA */
 		.settings = {
@@ -323,7 +449,7 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gpio_i2c_config,
 		},
 	},
-	/*CCI, IO Sensor - Add Sensor I2C bus BLSP2 E*/
+#endif
 	{					/*  NFC   */
 		.gpio      = 10,		/* BLSP1 QUP3 I2C_DAT */
 		.settings = {
@@ -339,6 +465,18 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 		},
 	},
 };
+
+#ifndef CONFIG_MACH_SONY_EAGLE
+static struct msm_gpiomux_config msm_blsp_spi_cs_config[] __initdata = {
+	{
+		.gpio      = 2,		/* BLSP1 QUP1 SPI_CS1 */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &gpio_spi_cs_act_config,
+			[GPIOMUX_SUSPENDED] = &gpio_spi_susp_config,
+		},
+	},
+};
+#endif
 
 static struct msm_gpiomux_config msm_synaptics_configs[] __initdata = {
 	{
@@ -776,7 +914,7 @@ static struct gpiomux_setting auxpcm_sus_cfg = {
 	.pull = GPIOMUX_PULL_DOWN,
 };
 
-//S [CCI]reset pin for compass YAS533
+#ifdef CONFIG_MACH_SONY_EAGLE
 static struct gpiomux_setting compass_rstn_act_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_2MA,
@@ -790,7 +928,6 @@ static struct gpiomux_setting compass_rstn_sus_cfg = {
 	.pull = GPIOMUX_PULL_UP,
 	.dir = GPIOMUX_OUT_HIGH,
 };
-//E [CCI]reset pin for compass YAS533
 
 static struct gpiomux_setting compass_int_sus_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
@@ -803,13 +940,17 @@ static struct gpiomux_setting acc_int_sus_cfg = {
 	.pull = GPIOMUX_PULL_NONE,
 };
 
+#endif
+
 static struct msm_gpiomux_config msm_auxpcm_configs[] __initdata = {
+#ifdef CONFIG_MACH_SONY_EAGLE
 	{
 		.gpio = 49, /*ACCL_INT1_N*/
 		.settings = {
 			[GPIOMUX_SUSPENDED] = &acc_int_sus_cfg,
 		},
 	},
+#endif
 	{
 		.gpio = 63,
 		.settings = {
@@ -817,6 +958,15 @@ static struct msm_gpiomux_config msm_auxpcm_configs[] __initdata = {
 			[GPIOMUX_ACTIVE] = &auxpcm_act_cfg,
 		},
 	},
+#ifndef CONFIG_MACH_SONY_EAGLE
+	{
+		.gpio = 64,
+		.settings = {
+			[GPIOMUX_SUSPENDED] = &auxpcm_sus_cfg,
+			[GPIOMUX_ACTIVE] = &auxpcm_act_cfg,
+		},
+	},
+#else
 	{
 		.gpio = 64, /*COMPASS_RSTN*/
 		.settings = {
@@ -824,6 +974,7 @@ static struct msm_gpiomux_config msm_auxpcm_configs[] __initdata = {
 			[GPIOMUX_ACTIVE] = &compass_rstn_act_cfg,
 		},
 	},
+#endif
 	{
 		.gpio = 65,
 		.settings = {
@@ -831,12 +982,22 @@ static struct msm_gpiomux_config msm_auxpcm_configs[] __initdata = {
 			[GPIOMUX_ACTIVE] = &auxpcm_act_cfg,
 		},
 	},
+#ifndef CONFIG_MACH_SONY_EAGLE
+	{
+		.gpio = 66,
+		.settings = {
+			[GPIOMUX_SUSPENDED] = &auxpcm_sus_cfg,
+			[GPIOMUX_ACTIVE] = &auxpcm_act_cfg,
+		},
+	},
+#else
 	{
 		.gpio = 66, /*MAG_INT_N*/
 		.settings = {
 			[GPIOMUX_SUSPENDED] = &compass_int_sus_cfg,
 		},
 	},
+#endif
 };
 
 static struct gpiomux_setting usb_otg_sw_cfg = {
@@ -958,9 +1119,15 @@ void __init msm8226_init_gpiomux(void)
 	if (of_board_is_skuf())
 		msm_gpiomux_install(msm_skuf_blsp_configs,
 			ARRAY_SIZE(msm_skuf_blsp_configs));
-	else
+	else {
 		msm_gpiomux_install(msm_blsp_configs,
 			ARRAY_SIZE(msm_blsp_configs));
+#ifndef CONFIG_MACH_SONY_EAGLE
+		if (machine_is_msm8226())
+			msm_gpiomux_install(msm_blsp_spi_cs_config,
+				ARRAY_SIZE(msm_blsp_spi_cs_config));
+#endif
+	}
 
 	msm_gpiomux_install(wcnss_5wire_interface,
 				ARRAY_SIZE(wcnss_5wire_interface));
@@ -976,16 +1143,13 @@ void __init msm8226_init_gpiomux(void)
 	if (of_board_is_skuf())
 		msm_gpiomux_install(msm_skuf_nfc_configs,
 				ARRAY_SIZE(msm_skuf_nfc_configs));
-
-	//S:LO
+#ifdef CONFIG_MACH_SONY_EAGLE
 	msm_gpiomux_install(msm8226_uim_det_configs,
 			ARRAY_SIZE(msm8226_uim_det_configs));
-	//E:LO
 
-	//S:EllenLu 20130709 ,[LED]add for SOMC Illumination
 	msm_gpiomux_install(msm8226_led_det_configs,
 			ARRAY_SIZE(msm8226_led_det_configs));
-	//E:EllenLu 20130709 ,[LED]add for SOMC Illumination
+#endif
 
 	msm_gpiomux_install_nowrite(msm_lcd_configs,
 			ARRAY_SIZE(msm_lcd_configs));
@@ -996,11 +1160,11 @@ void __init msm8226_init_gpiomux(void)
 		msm_gpiomux_install(msm_sensor_configs_skuf_plus,
 			ARRAY_SIZE(msm_sensor_configs_skuf_plus));
 
-	/*[Bug 911] S Jonny_Chan*/
+#ifdef CONFIG_MACH_SONY_EAGLE
 	msm_gpiomux_install(msm8226_ovp_configs,
 			ARRAY_SIZE(msm8226_ovp_configs));
-	/*[Bug 911] E Jonny_Chan*/
-	
+#endif
+
 	msm_gpiomux_install(msm_auxpcm_configs,
 			ARRAY_SIZE(msm_auxpcm_configs));
 
@@ -1022,6 +1186,9 @@ void __init msm8226_init_gpiomux(void)
 	}
 	msm_gpiomux_install(msm_hsic_configs, ARRAY_SIZE(msm_hsic_configs));
 #endif
+	if (machine_is_msm8926() && of_board_is_mtp())
+		msm_gpiomux_install(smsc_hub_configs,
+			ARRAY_SIZE(smsc_hub_configs));
 }
 
 static void wcnss_switch_to_gpio(void)
