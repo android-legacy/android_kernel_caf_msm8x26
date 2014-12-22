@@ -57,45 +57,7 @@ static struct msm_gpiomux_config msm_hsic_configs[] = {
 };
 #endif
 
-static struct gpiomux_setting smsc_hub_act_cfg = {
-	.func = GPIOMUX_FUNC_GPIO,
-	.drv = GPIOMUX_DRV_8MA,
-	.pull = GPIOMUX_PULL_NONE,
-};
-
-static struct gpiomux_setting smsc_hub_susp_cfg = {
-	.func = GPIOMUX_FUNC_GPIO,
-	.drv = GPIOMUX_DRV_2MA,
-	.pull = GPIOMUX_PULL_NONE,
-};
-
-static struct msm_gpiomux_config smsc_hub_configs[] = {
-	{
-		.gpio = 114, /* reset_n */
-		.settings = {
-			[GPIOMUX_ACTIVE] = &smsc_hub_act_cfg,
-			[GPIOMUX_SUSPENDED] = &smsc_hub_susp_cfg,
-		},
-	},
-	{
-		.gpio = 8, /* clk_en */
-		.settings = {
-			[GPIOMUX_ACTIVE] = &smsc_hub_act_cfg,
-			[GPIOMUX_SUSPENDED] = &smsc_hub_susp_cfg,
-		},
-	},
-	{
-		.gpio = 9, /* int_n */
-		.settings = {
-			[GPIOMUX_ACTIVE] = &smsc_hub_act_cfg,
-			[GPIOMUX_SUSPENDED] = &smsc_hub_susp_cfg,
-		},
-	},
-};
-
-#define KS8851_IRQ_GPIO 115
-
-//S:EllenLu 20130709 ,[LED]add for SOMC Illumination
+#ifdef CONFIG_SONY_EAGLE
 static struct gpiomux_setting led_det_actv_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_2MA,
@@ -118,26 +80,7 @@ static struct msm_gpiomux_config msm8226_led_det_configs[] __initdata = {
 		},
 	},
 };
-//E:EllenLu 20130709 ,[LED]add for SOMC Illumination
 
-#if defined(CONFIG_KS8851) || defined(CONFIG_KS8851_MODULE)
-static struct gpiomux_setting gpio_eth_config = {
-	.pull = GPIOMUX_PULL_UP,
-	.drv = GPIOMUX_DRV_2MA,
-	.func = GPIOMUX_FUNC_GPIO,
-};
-
-static struct msm_gpiomux_config msm_eth_configs[] = {
-	{
-		.gpio = KS8851_IRQ_GPIO,
-		.settings = {
-			[GPIOMUX_SUSPENDED] = &gpio_eth_config,
-		}
-	},
-};
-#endif
-
-//S:LO
 static struct gpiomux_setting uim1_det_actv_cfg = {
 	.func = GPIOMUX_FUNC_1,
 	.drv = GPIOMUX_DRV_2MA,
@@ -184,9 +127,64 @@ static struct msm_gpiomux_config msm8226_uim_det_configs[] __initdata = {
 	},
 #endif
 };
-//E:LO
+#endif
 
-/*[Bug911] S Jonny_Chan */
+static struct gpiomux_setting smsc_hub_act_cfg = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_8MA,
+	.pull = GPIOMUX_PULL_NONE,
+};
+
+static struct gpiomux_setting smsc_hub_susp_cfg = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_NONE,
+};
+
+static struct msm_gpiomux_config smsc_hub_configs[] = {
+	{
+		.gpio = 114, /* reset_n */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &smsc_hub_act_cfg,
+			[GPIOMUX_SUSPENDED] = &smsc_hub_susp_cfg,
+		},
+	},
+	{
+		.gpio = 8, /* clk_en */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &smsc_hub_act_cfg,
+			[GPIOMUX_SUSPENDED] = &smsc_hub_susp_cfg,
+		},
+	},
+	{
+		.gpio = 9, /* int_n */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &smsc_hub_act_cfg,
+			[GPIOMUX_SUSPENDED] = &smsc_hub_susp_cfg,
+		},
+	},
+};
+
+#define KS8851_IRQ_GPIO 115
+
+#if defined(CONFIG_KS8851) || defined(CONFIG_KS8851_MODULE)
+static struct gpiomux_setting gpio_eth_config = {
+	.pull = GPIOMUX_PULL_UP,
+	.drv = GPIOMUX_DRV_2MA,
+	.func = GPIOMUX_FUNC_GPIO,
+};
+
+static struct msm_gpiomux_config msm_eth_configs[] = {
+	{
+		.gpio = KS8851_IRQ_GPIO,
+		.settings = {
+			[GPIOMUX_SUSPENDED] = &gpio_eth_config,
+		}
+	},
+};
+#endif
+
+#ifdef CONFIG_SONY_EAGLE
 static struct gpiomux_setting ovp_sus_config = {
 	.pull = GPIOMUX_PULL_NONE,
 	.drv = GPIOMUX_DRV_2MA,
@@ -198,11 +196,12 @@ static struct msm_gpiomux_config msm8226_ovp_configs[] = {
 	{
 		.gpio = 34,
 		.settings = {
-			[GPIOMUX_SUSPENDED] = &ovp_sus_config,
+		[GPIOMUX_SUSPENDED] = &ovp_sus_config,
 		}
 	},
 };
-/*[Bug911] E Jonny_Chan */
+#endif
+
 static struct gpiomux_setting synaptics_int_act_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_8MA,
@@ -437,8 +436,7 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gpio_spi_cs_eth_config,
 		},
 	},
-#endif
-	/*CCI, IO Sensor - Add sensor I2C bus BLSP2 S*/
+#else
 	{
 		.gpio      = 6,		/* BLSP1 QUP2 I2C_SDA */
 		.settings = {
@@ -451,7 +449,7 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gpio_i2c_config,
 		},
 	},
-	/*CCI, IO Sensor - Add Sensor I2C bus BLSP2 E*/
+#endif
 	{					/*  NFC   */
 		.gpio      = 10,		/* BLSP1 QUP3 I2C_DAT */
 		.settings = {
@@ -497,13 +495,11 @@ static struct msm_gpiomux_config msm_synaptics_configs[] __initdata = {
 	},
 };
 
-#ifndef CONFIG_SONY_EAGLE
 static struct gpiomux_setting gpio_nc_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_2MA,
 	.pull = GPIOMUX_PULL_NONE,
 };
-#endif
 
 static struct gpiomux_setting goodix_ldo_en_act_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
@@ -541,7 +537,6 @@ static struct gpiomux_setting goodix_reset_sus_cfg = {
 	.pull = GPIOMUX_PULL_DOWN,
 };
 
-#ifndef CONFIG_SONY_EAGLE
 static struct msm_gpiomux_config msm_skuf_blsp_configs[] __initdata = {
 	{
 		.gpio      = 2,		/* NC */
@@ -568,7 +563,6 @@ static struct msm_gpiomux_config msm_skuf_blsp_configs[] __initdata = {
 		},
 	},
 };
-#endif
 
 static struct msm_gpiomux_config msm_skuf_goodix_configs[] __initdata = {
 	{
@@ -920,7 +914,7 @@ static struct gpiomux_setting auxpcm_sus_cfg = {
 	.pull = GPIOMUX_PULL_DOWN,
 };
 
-//S [CCI]reset pin for compass YAS533
+#ifdef CONFIG_SONY_EAGLE
 static struct gpiomux_setting compass_rstn_act_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_2MA,
@@ -934,7 +928,6 @@ static struct gpiomux_setting compass_rstn_sus_cfg = {
 	.pull = GPIOMUX_PULL_UP,
 	.dir = GPIOMUX_OUT_HIGH,
 };
-//E [CCI]reset pin for compass YAS533
 
 static struct gpiomux_setting compass_int_sus_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
@@ -947,13 +940,17 @@ static struct gpiomux_setting acc_int_sus_cfg = {
 	.pull = GPIOMUX_PULL_NONE,
 };
 
+#endif
+
 static struct msm_gpiomux_config msm_auxpcm_configs[] __initdata = {
+#ifdef CONFIG_SONY_EAGLE
 	{
 		.gpio = 49, /*ACCL_INT1_N*/
 		.settings = {
 			[GPIOMUX_SUSPENDED] = &acc_int_sus_cfg,
 		},
 	},
+#endif
 	{
 		.gpio = 63,
 		.settings = {
@@ -961,6 +958,15 @@ static struct msm_gpiomux_config msm_auxpcm_configs[] __initdata = {
 			[GPIOMUX_ACTIVE] = &auxpcm_act_cfg,
 		},
 	},
+#ifndef CONFIG_SONY_EAGLE
+	{
+		.gpio = 64,
+		.settings = {
+			[GPIOMUX_SUSPENDED] = &auxpcm_sus_cfg,
+			[GPIOMUX_ACTIVE] = &auxpcm_act_cfg,
+		},
+	},
+#else
 	{
 		.gpio = 64, /*COMPASS_RSTN*/
 		.settings = {
@@ -968,6 +974,7 @@ static struct msm_gpiomux_config msm_auxpcm_configs[] __initdata = {
 			[GPIOMUX_ACTIVE] = &compass_rstn_act_cfg,
 		},
 	},
+#endif
 	{
 		.gpio = 65,
 		.settings = {
@@ -975,12 +982,22 @@ static struct msm_gpiomux_config msm_auxpcm_configs[] __initdata = {
 			[GPIOMUX_ACTIVE] = &auxpcm_act_cfg,
 		},
 	},
+#ifndef CONFIG_SONY_EAGLE
+	{
+		.gpio = 66,
+		.settings = {
+			[GPIOMUX_SUSPENDED] = &auxpcm_sus_cfg,
+			[GPIOMUX_ACTIVE] = &auxpcm_act_cfg,
+		},
+	},
+#else
 	{
 		.gpio = 66, /*MAG_INT_N*/
 		.settings = {
 			[GPIOMUX_SUSPENDED] = &compass_int_sus_cfg,
 		},
 	},
+#endif
 };
 
 static struct gpiomux_setting usb_otg_sw_cfg = {
@@ -1099,20 +1116,18 @@ void __init msm8226_init_gpiomux(void)
 	msm_gpiomux_install(msm_keypad_configs,
 			ARRAY_SIZE(msm_keypad_configs));
 
-#ifndef CONFIG_SONY_EAGLE
 	if (of_board_is_skuf())
 		msm_gpiomux_install(msm_skuf_blsp_configs,
 			ARRAY_SIZE(msm_skuf_blsp_configs));
 	else {
-#endif
 		msm_gpiomux_install(msm_blsp_configs,
 			ARRAY_SIZE(msm_blsp_configs));
 #ifndef CONFIG_SONY_EAGLE
 		if (machine_is_msm8226())
 			msm_gpiomux_install(msm_blsp_spi_cs_config,
 				ARRAY_SIZE(msm_blsp_spi_cs_config));
-	}
 #endif
+	}
 
 	msm_gpiomux_install(wcnss_5wire_interface,
 				ARRAY_SIZE(wcnss_5wire_interface));
@@ -1128,16 +1143,13 @@ void __init msm8226_init_gpiomux(void)
 	if (of_board_is_skuf())
 		msm_gpiomux_install(msm_skuf_nfc_configs,
 				ARRAY_SIZE(msm_skuf_nfc_configs));
-
-	//S:LO
+#ifdef CONFIG_SONY_EAGLE
 	msm_gpiomux_install(msm8226_uim_det_configs,
 			ARRAY_SIZE(msm8226_uim_det_configs));
-	//E:LO
 
-	//S:EllenLu 20130709 ,[LED]add for SOMC Illumination
 	msm_gpiomux_install(msm8226_led_det_configs,
 			ARRAY_SIZE(msm8226_led_det_configs));
-	//E:EllenLu 20130709 ,[LED]add for SOMC Illumination
+#endif
 
 	msm_gpiomux_install_nowrite(msm_lcd_configs,
 			ARRAY_SIZE(msm_lcd_configs));
@@ -1148,11 +1160,11 @@ void __init msm8226_init_gpiomux(void)
 		msm_gpiomux_install(msm_sensor_configs_skuf_plus,
 			ARRAY_SIZE(msm_sensor_configs_skuf_plus));
 
-	/*[Bug 911] S Jonny_Chan*/
+#ifdef CONFIG_SONY_EAGLE
 	msm_gpiomux_install(msm8226_ovp_configs,
 			ARRAY_SIZE(msm8226_ovp_configs));
-	/*[Bug 911] E Jonny_Chan*/
-	
+#endif
+
 	msm_gpiomux_install(msm_auxpcm_configs,
 			ARRAY_SIZE(msm_auxpcm_configs));
 
