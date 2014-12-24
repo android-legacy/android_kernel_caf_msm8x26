@@ -4204,8 +4204,6 @@ static int qseecom_resume(struct platform_device *pdev)
 			qseecom.qsee_perf_client, mode);
 		if (ret)
 			pr_err("Fail to scale up bus to %d\n", mode);
-		else
-			qseecom.current_mode = mode;
 	}
 
 	if (qclk->clk_access_cnt) {
