@@ -1065,6 +1065,7 @@ int mdss_dsi_panel_init(struct device_node *node,
 {
 	int rc = 0;
 	static const char *panel_name;
+	struct mdss_panel_info *pinfo;
 	char *path_name = "mdss_dsi_panel";//[VVVV] JackBB 2014/6/9
 
 	if (!node || !ctrl_pdata) {
