@@ -143,7 +143,7 @@ kgsl_get_pagetable(unsigned long name)
 				ret = pt;
 				break;
 			}
-			kref_put(&pt->refcount, kgsl_destroy_pagetable_locked);  
+			kref_put(&pt->refcount, kgsl_destroy_pagetable_locked);
 		}
 	}
 
@@ -344,10 +344,10 @@ kgsl_mmu_get_ptname_from_ptbase(struct kgsl_mmu *mmu, phys_addr_t pt_base)
 			if (mmu->mmu_ops->mmu_pt_equal(mmu, pt, pt_base)) {
 				ptid = (int) pt->name;
 				kref_put(&pt->refcount,
-					kgsl_destroy_pagetable_locked);  
+					kgsl_destroy_pagetable_locked);
 				break;
 			}
-			kref_put(&pt->refcount, kgsl_destroy_pagetable_locked);  
+			kref_put(&pt->refcount, kgsl_destroy_pagetable_locked);
 		}
 	}
 	spin_unlock(&kgsl_driver.ptlock);
@@ -372,18 +372,18 @@ kgsl_mmu_log_fault_addr(struct kgsl_mmu *mmu, phys_addr_t pt_base,
 				if ((addr & ~(PAGE_SIZE-1)) == pt->fault_addr) {
 					ret = 1;
 					kref_put(&pt->refcount,
-						kgsl_destroy_pagetable_locked);  
+						kgsl_destroy_pagetable_locked);
 					break;
 				} else {
 					pt->fault_addr =
 						(addr & ~(PAGE_SIZE-1));
 					ret = 0;
 					kref_put(&pt->refcount,
-						kgsl_destroy_pagetable_locked);  
+						kgsl_destroy_pagetable_locked);
 					break;
 				}
 			}
-			kref_put(&pt->refcount, kgsl_destroy_pagetable_locked);  
+			kref_put(&pt->refcount, kgsl_destroy_pagetable_locked);
 		}
 	}
 	spin_unlock(&kgsl_driver.ptlock);
