@@ -225,12 +225,10 @@
 			//[Bug1121] Jonny_Chan
 			qcom,use-external-rsense;			
 
-			//[CCI] S- Bug#2723 SR patches Jonny_Chan 
 			qcom,batt-pres-status@1208 {
 				reg = <0x1208 0x1>;
 			};
-			//[CCI] E- Bug#2723 SR patches Jonny_Chan 
-			
+
 			qcom,bms-iadc@3800 {
 				reg = <0x3800 0x100>;
 			};
