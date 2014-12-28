@@ -945,13 +945,7 @@ static void msm_vfe40_update_camif_state(struct vfe_device *vfe_dev,
 	} else if (update_state == DISABLE_CAMIF_IMMEDIATELY) {
 		msm_camera_io_w_mb(0x6, vfe_dev->vfe_base + 0x2F4);
 		vfe_dev->axi_data.src_info[VFE_PIX_0].active = 0;
-#ifdef CONFIG_SONY_EAGLE
-	} else if (update_state == DISABLE_CAMIF_IMMEDIATELY_VFE_RECOVER) {
-		/*disable image data capture immediately*/
-		msm_camera_io_w_mb(0x2, vfe_dev->vfe_base + 0x2F4);
-		vfe_dev->axi_data.src_info[VFE_PIX_0].active = 0;
 	}
-#endif
 }
 
 static void msm_vfe40_cfg_rdi_reg(
@@ -1119,11 +1113,7 @@ static void msm_vfe40_axi_clear_wm_xbar_reg(
 		vfe_dev->vfe_base + VFE40_XBAR_BASE(wm));
 }
 
-#ifndef CONFIG_SONY_EAGLE
 #define MSM_ISP40_TOTAL_WM_UB 819
-#else
-#define MSM_ISP40_TOTAL_WM_UB 1140
-#endif
 
 static void msm_vfe40_cfg_axi_ub_equal_default(
 	struct vfe_device *vfe_dev)
