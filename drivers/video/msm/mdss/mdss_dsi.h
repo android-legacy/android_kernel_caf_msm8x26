@@ -1,5 +1,4 @@
 /* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
- * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -21,7 +20,6 @@
 #include "mdss_panel.h"
 #include "mdss_io_util.h"
 #include "mdss_dsi_cmd.h"
-#include "mdss_fb.h"
 
 #define MMSS_SERDES_BASE_PHY 0x04f01000 /* mmss (De)Serializer CFG */
 
@@ -218,40 +216,6 @@ struct dsi_kickoff_action {
 	void *data;
 };
 
-#ifdef CONFIG_FB_MSM_MDSS_PANEL_SPECIFIC
-/* panel DriverIC type */
-enum {
-	PANEL_DRIVER_IC_RENESAS,
-	PANEL_DRIVER_IC_NOVATEK,
-	PANEL_DRIVER_IC_NONE,
-};
-
-struct mdss_panel_specific_pdata {
-	bool detected;
-	int driver_ic;
-	int disp_on_in_hs;
-	int panel_detect;
-	int cabc_enabled;
-	int cabc_active;
-
-	struct dsi_panel_cmds einit_cmds;
-	struct dsi_panel_cmds init_cmds;
-	struct dsi_panel_cmds on_cmds;
-	struct dsi_panel_cmds off_cmds;
-	struct dsi_panel_cmds id_read_cmds;
-	struct dsi_panel_cmds cabc_on_cmds;
-	struct dsi_panel_cmds cabc_off_cmds;
-
-	int (*panel_power_on) (struct mdss_panel_data *pdata, int enable);
-	int (*disp_on) (struct mdss_panel_data *pdata);
-	int (*detect) (struct mdss_panel_data *pdata);
-	int (*update_panel) (struct mdss_panel_data *pdata);
-	int (*update_fps) (struct msm_fb_data_type *mfd);
-	int (*reset) (struct mdss_panel_data *pdata, int enable);
-
-};
-#endif
-
 struct dsi_drv_cm_data {
 	struct regulator *vdd_vreg;
 	struct regulator *vdd_io_vreg;
@@ -322,9 +286,6 @@ struct mdss_dsi_ctrl_pdata {
 	u32 pclk_rate;
 	u32 byte_clk_rate;
 	struct dss_module_power power_data;
-#ifdef CONFIG_FB_MSM_MDSS_PANEL_SPECIFIC
-	struct mdss_panel_specific_pdata *spec_pdata;
-#endif
 	u32 dsi_irq_mask;
 	struct mdss_hw *dsi_hw;
 	struct mdss_panel_recovery *recovery;
@@ -336,10 +297,6 @@ struct mdss_dsi_ctrl_pdata {
 
 	struct dsi_panel_cmds video2cmd;
 	struct dsi_panel_cmds cmd2video;
-
-#ifdef CONFIG_FB_MSM_MDSS_PANEL_SPECIFIC
-	struct dsi_panel_cmds cabc_off_cmds;
-#endif	/* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 	struct dcs_cmd_list cmdlist;
 	struct completion dma_comp;
@@ -356,11 +313,6 @@ struct mdss_dsi_ctrl_pdata {
 
 	struct dsi_buf tx_buf;
 	struct dsi_buf rx_buf;
-#ifdef CONFIG_MACH_SONY_FLAMINGO
-/*[Flamingo] LCM driver porting */
-	struct regulator *vdd_io_vreg;
-	struct regulator *vdda_vreg;
-#endif	
 	struct dsi_buf status_buf;
 	int status_mode;
 };
@@ -373,10 +325,6 @@ struct dsi_status_data {
 
 int dsi_panel_device_register(struct device_node *pan_node,
 				struct mdss_dsi_ctrl_pdata *ctrl_pdata);
-
-#ifdef CONFIG_FB_MSM_MDSS_PANEL_SPECIFIC
-int mdss_dsi_panel_power_detect(struct platform_device *pdev, int enable);
-#endif
 
 int mdss_dsi_cmds_tx(struct mdss_dsi_ctrl_pdata *ctrl,
 		struct dsi_cmd_desc *cmds, int cnt);
@@ -404,11 +352,6 @@ irqreturn_t mdss_dsi_isr(int irq, void *ptr);
 void mdss_dsi_irq_handler_config(struct mdss_dsi_ctrl_pdata *ctrl_pdata);
 
 void mdss_dsi_set_tx_power_mode(int mode, struct mdss_panel_data *pdata);
-#ifndef CONFIG_FB_MSM_MDSS_PANEL_SPECIFIC
-void mipi_set_tx_power_mode(int mode, struct mdss_panel_data *pdata);
-#else
-void mdss_set_tx_power_mode(int mode, struct mdss_panel_data *pdata);
-#endif
 int mdss_dsi_clk_div_config(struct mdss_panel_info *panel_info,
 			    int frame_rate);
 int mdss_dsi_clk_init(struct platform_device *pdev,
@@ -432,10 +375,6 @@ void mdss_dsi_cmdlist_kickoff(int intf);
 int mdss_dsi_bta_status_check(struct mdss_dsi_ctrl_pdata *ctrl);
 int mdss_dsi_reg_status_check(struct mdss_dsi_ctrl_pdata *ctrl);
 bool __mdss_dsi_clk_enabled(struct mdss_dsi_ctrl_pdata *ctrl, u8 clk_type);
-
-#ifdef CONFIG_FB_MSM_MDSS_PANEL_SPECIFIC
-int mdss_dsi_panel_fps_data_update(struct msm_fb_data_type *mfd);
-#endif
 
 int mdss_dsi_panel_init(struct device_node *node,
 		struct mdss_dsi_ctrl_pdata *ctrl_pdata,

@@ -3,7 +3,6 @@
  *
  * Copyright (C) 2007 Google Incorporated
  * Copyright (c) 2008-2014, The Linux Foundation. All rights reserved.
- * Copyright (C) 2013 Sony Mobile Communications AB.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -53,9 +52,6 @@
 #include <mach/msm_memtypes.h>
 
 #include "mdss_fb.h"
-#include "mdss_mdp.h"
-#include "mdss_dsi.h"
-#include <linux/gpio.h> 
 #include "mdss_mdp_splash_logo.h"
 
 #ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
@@ -80,7 +76,7 @@ static struct msm_mdp_interface *mdp_instance;
 static int mdss_fb_register(struct msm_fb_data_type *mfd);
 static int mdss_fb_open(struct fb_info *info, int user);
 static int mdss_fb_release(struct fb_info *info, int user);
-static int mdss_fb_release_all(struct fb_info *info, bool release_all);
+static int mdss_fb_release_all(struct fb_info *info, bool release_all,int user);//[VVVV] JackBB 2013/12/05 Fix no free pipe
 static int mdss_fb_pan_display(struct fb_var_screeninfo *var,
 			       struct fb_info *info);
 static int mdss_fb_check_var(struct fb_var_screeninfo *var,
@@ -228,9 +224,6 @@ static struct led_classdev backlight_led = {
 	.name           = "lcd-backlight",
 	.brightness     = MDSS_MAX_BL_BRIGHTNESS,
 	.brightness_set = mdss_fb_set_bl_brightness,
-#ifdef CONFIG_FB_MSM_MDSS_PANEL_SPECIFIC
-	.max_brightness = MDSS_MAX_BL_BRIGHTNESS,
-#endif
 };
 
 static ssize_t mdss_fb_get_type(struct device *dev,
@@ -382,24 +375,6 @@ static ssize_t mdss_fb_get_idle_notify(struct device *dev,
 	return ret;
 }
 
-#ifdef CONFIG_MACH_SONY_FLAMINGO
-/* [Flamingo] Read LCM ID info. for ATS */
-#define LCM_ID_PIN	27
-extern char temp_buf[];		
-static ssize_t mdss_fb_lcm_module_id(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	ssize_t ret = 0;
-
-	if (*temp_buf != '\0')
-		ret = snprintf(buf, PAGE_SIZE, temp_buf);
-	else
-		ret = snprintf(buf, PAGE_SIZE, "TRULY\n");
-
-	return ret;
-}
-#endif
-
 static ssize_t mdss_fb_get_panel_info(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -507,10 +482,6 @@ static int mdss_fb_lpm_enable(struct msm_fb_data_type *mfd, int mode)
 static DEVICE_ATTR(msm_fb_type, S_IRUGO, mdss_fb_get_type, NULL);
 static DEVICE_ATTR(msm_fb_split, S_IRUGO, mdss_fb_get_split, NULL);
 static DEVICE_ATTR(show_blank_event, S_IRUGO, mdss_mdp_show_blank_event, NULL);
-#ifdef CONFIG_MACH_SONY_FLAMINGO
-/*[Flamingo] Read LCM ID for ATS */
-static DEVICE_ATTR(lcm_module_id, S_IRUGO, mdss_fb_lcm_module_id, NULL);
-#endif
 static DEVICE_ATTR(idle_time, S_IRUGO | S_IWUSR | S_IWGRP,
 	mdss_fb_get_idle_time, mdss_fb_set_idle_time);
 static DEVICE_ATTR(idle_notify, S_IRUGO, mdss_fb_get_idle_notify, NULL);
@@ -520,10 +491,6 @@ static struct attribute *mdss_fb_attrs[] = {
 	&dev_attr_msm_fb_type.attr,
 	&dev_attr_msm_fb_split.attr,
 	&dev_attr_show_blank_event.attr,
-#ifdef CONFIG_MACH_SONY_FLAMINGO
-/*[Flamingo] Read LCM ID for ATS */
-	&dev_attr_lcm_module_id.attr,
-#endif
 	&dev_attr_idle_time.attr,
 	&dev_attr_idle_notify.attr,
 	&dev_attr_msm_fb_panel_info.attr,
@@ -555,7 +522,7 @@ static void mdss_fb_shutdown(struct platform_device *pdev)
 
 	mfd->shutdown_pending = true;
 	lock_fb_info(mfd->fbi);
-	mdss_fb_release_all(mfd->fbi, true);
+	mdss_fb_release_all(mfd->fbi, true,1);
 	unlock_fb_info(mfd->fbi);
 }
 
@@ -703,14 +670,6 @@ static int mdss_fb_remove(struct platform_device *pdev)
 
 	if (mfd->key != MFD_KEY)
 		return -EINVAL;
-
-#ifndef CONFIG_MACH_SONY_EAGLE
-#ifdef CONFIG_DEBUG_FS
-	if ((mfd->panel_info->type == MIPI_VIDEO_PANEL) ||
-		(mfd->panel_info->type == MIPI_CMD_PANEL))
-		mipi_dsi_panel_remove_debugfs(mfd);
-#endif
-#endif
 
 	if (mdss_fb_suspend_sub(mfd))
 		pr_err("msm_fb_remove: can't stop the device %d\n",
@@ -1493,6 +1452,13 @@ static int mdss_fb_open(struct fb_info *info, int user)
 	int pid = current->tgid;
 	struct task_struct *task = current->group_leader;
 
+//S [VVVV] JackBB 2013/11/7
+  if(user == 0)
+  {
+    pr_info("mdss_fb_open() user=%d ",user);
+  }
+//E [VVVV] JackBB 2013/11/7
+
 	if (mfd->shutdown_pending) {
 		pr_err("Shutdown pending. Aborting operation. Request from pid:%d name=%s\n",
 				pid, task->comm);
@@ -1563,7 +1529,7 @@ pm_error:
 	return result;
 }
 
-static int mdss_fb_release_all(struct fb_info *info, bool release_all)
+static int mdss_fb_release_all(struct fb_info *info, bool release_all, int user)//[VVVV] JackBB 2013/12/05 Fix no free pipe
 {
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
 	struct mdss_fb_proc_info *pinfo = NULL, *temp_pinfo = NULL;
@@ -1571,6 +1537,13 @@ static int mdss_fb_release_all(struct fb_info *info, bool release_all)
 	int pid = current->tgid;
 	bool unknown_pid = true, release_needed = false;
 	struct task_struct *task = current->group_leader;
+
+//S [VVVV] JackBB 2013/11/7
+  if(user == 0)
+  {
+    pr_info("mdss_fb_release() user=%d",user);
+  }
+//E [VVVV] JackBB 2013/11/7
 
 	if (!mfd->ref_cnt) {
 		pr_info("try to close unopened fb %d! from %s\n", mfd->index,
@@ -1623,6 +1596,11 @@ static int mdss_fb_release_all(struct fb_info *info, bool release_all)
 			break;
 	}
 
+	if(user == 0)
+	{
+		release_all = true;
+	}
+
 	if (release_needed) {
 		pr_debug("known process %s pid=%d mfd->ref=%d\n",
 			task->comm, pid, mfd->ref_cnt);
@@ -1669,7 +1647,7 @@ static int mdss_fb_release_all(struct fb_info *info, bool release_all)
 
 static int mdss_fb_release(struct fb_info *info, int user)
 {
-	return mdss_fb_release_all(info, false);
+	return mdss_fb_release_all(info, false,user);
 }
 
 static void mdss_fb_power_setting_idle(struct msm_fb_data_type *mfd)
@@ -2014,9 +1992,6 @@ static int __mdss_fb_perform_commit(struct msm_fb_data_type *mfd)
 		else
 			pr_warn("no kickoff function setup for fb%d\n",
 					mfd->index);
-#ifdef CONFIG_FB_MSM_MDSS_PANEL_SPECIFIC
-		mdss_dsi_panel_fps_data_update(mfd);
-#endif
 	} else {
 		ret = mdss_fb_pan_display_sub(&fb_backup->disp_commit.var,
 				&fb_backup->info);
@@ -2029,9 +2004,6 @@ static int __mdss_fb_perform_commit(struct msm_fb_data_type *mfd)
 	if (!ret)
 		mdss_fb_update_backlight(mfd);
 
-#ifdef CONFIG_FB_MSM_MDSS_PANEL_SPECIFIC
-		mdss_dsi_panel_fps_data_update(mfd);
-#endif
 	if (IS_ERR_VALUE(ret) || !sync_pt_data->flushed)
 		mdss_fb_signal_timeline(sync_pt_data);
 

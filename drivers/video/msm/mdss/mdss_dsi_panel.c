@@ -26,17 +26,6 @@
 
 #define DT_CMD_HDR 6
 
-#ifdef CONFIG_MACH_SONY_FLAMINGO
-#define SYSTEM_RESET_PIN_TS 16	// Touch Screen HW Reset Pin
-#endif
-
-/* [Flamingo] LCM driver porting */
-#ifdef CONFIG_MACH_SONY_FLAMINGO
-#define TRULY_MIPI_DISP_RST_N 25
-#define TRULY_LCM_BL_EN 15
-int lcm_first_boot = 1;
-#endif
-
 DEFINE_LED_TRIGGER(bl_led_trigger);
 
 void mdss_dsi_panel_pwm_cfg(struct mdss_dsi_ctrl_pdata *ctrl)
@@ -160,13 +149,30 @@ static struct dsi_cmd_desc backlight_cmd = {
 	led_pwm1
 };
 
+extern int g_mdss_dsi_lcd_id;
+
 static void mdss_dsi_panel_bklt_dcs(struct mdss_dsi_ctrl_pdata *ctrl, int level)
 {
 	struct dcs_cmd_req cmdreq;
+//S [VVVV] JackBB 2014/3/21 BL Modify
+  int new_level;
 
-	pr_debug("%s: level=%d\n", __func__, level);
+  if(g_mdss_dsi_lcd_id == 0)
+  {
+    new_level = level*800/1000;
+  }
+  else if(g_mdss_dsi_lcd_id == 1)
+  {
+    new_level = level*900/1000;
+  }
 
-	led_pwm1[1] = (unsigned char)level;
+	if(level==255)
+	{
+		pr_info("%s: level=%d new_level=%d\n", __func__, level,new_level);
+	}
+
+	led_pwm1[1] = (unsigned char)new_level;
+//E [VVVV] JackBB 2014/3/21 BL Modify
 
 	memset(&cmdreq, 0, sizeof(cmdreq));
 	cmdreq.cmds = &backlight_cmd;
@@ -220,11 +226,7 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 {
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
 	struct mdss_panel_info *pinfo = NULL;
-	int rc = 0;
-#ifndef CONFIG_MACH_SONY_FLAMINGO
-/* [Flamingo] LCM driver porting */
-	int i;
-#endif
+	int i, rc = 0;
 
 	if (pdata == NULL) {
 		pr_err("%s: Invalid input data\n", __func__);
@@ -245,7 +247,7 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 		return rc;
 	}
 
-	pr_debug("%s: enable = %d\n", __func__, enable);
+	pr_info("%s: enable = %d\n", __func__, enable);//[VVVV] JackBB 2013/11/09
 	pinfo = &(ctrl_pdata->panel_data.panel_info);
 
 	if (enable) {
@@ -346,30 +348,6 @@ static int mdss_dsi_panel_partial_update(struct mdss_panel_data *pdata)
 	return rc;
 }
 
-#ifdef CONFIG_MACH_SONY_FLAMINGO
-/*[Flamingo] LCM driver porting */
-static int aat1430_backlight_control(struct mdss_dsi_ctrl_pdata *ctrl, int bl_level)
-{
-	int i = 0;
-	int set_bl; 
-	set_bl = abs(ctrl->panel_data.panel_info.bl_max-bl_level)+1;
-	pr_info("[R]%s:++,bl_level %d \n", __func__,bl_level);
-	for (i=0;i<set_bl;i++)
-		{
-			gpio_set_value(TRULY_LCM_BL_EN, 1);
-			udelay(10);
-			gpio_set_value(TRULY_LCM_BL_EN, 0);
-			udelay(10);
-		}
-	if(bl_level==0)
-		gpio_set_value(TRULY_LCM_BL_EN, 0);
-	else
-		gpio_set_value(TRULY_LCM_BL_EN, 1);
-		udelay(500);
-	return 0;
-}
-#endif
-
 static void mdss_dsi_panel_switch_mode(struct mdss_panel_data *pdata,
 							int mode)
 {
@@ -404,12 +382,6 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 							u32 bl_level)
 {
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
-
-#ifdef CONFIG_MACH_SONY_FLAMINGO
-/*[Flamingo] LCM driver porting */
-	unsigned long flags;
-	pr_info("[R][%s](%d):bl_level:%d\n", __func__, __LINE__,bl_level);
-#endif
 
 	if (pdata == NULL) {
 		pr_err("%s: Invalid input data\n", __func__);
@@ -451,13 +423,6 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 	default:
 		pr_err("%s: Unknown bl_ctrl configuration\n",
 			__func__);
-
-#ifdef CONFIG_MACH_SONY_FLAMINGO
-/*[Flamingo] LCM driver porting */
-		spin_lock_irqsave(&ctrl_pdata->irq_lock, flags);
-		aat1430_backlight_control(ctrl_pdata, bl_level);
-		spin_unlock_irqrestore(&ctrl_pdata->irq_lock, flags);		
-#endif
 		break;
 	}
 }
@@ -477,11 +442,6 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 	mipi  = &pdata->panel_info.mipi;
 
 	pr_debug("%s: ctrl=%p ndx=%d\n", __func__, ctrl, ctrl->ndx);
-
-#ifdef CONFIG_MACH_SONY_FLAMINGO
-/*[Flamingo] LCM driver porting */
-	lcm_first_boot=0;
-#endif
 
 	if (ctrl->on_cmds.cmd_cnt)
 		mdss_dsi_panel_cmds_send(ctrl, &ctrl->on_cmds);
@@ -509,14 +469,6 @@ static int mdss_dsi_panel_off(struct mdss_panel_data *pdata)
 
 	if (ctrl->off_cmds.cmd_cnt)
 		mdss_dsi_panel_cmds_send(ctrl, &ctrl->off_cmds);
-
-#ifdef CONFIG_MACH_SONY_FLAMINGO
-/*[Flamingo] LCM driver porting */
-	if (lcm_first_boot == 0)	{
-		gpio_set_value(TRULY_MIPI_DISP_RST_N, 0);
-		msleep(120);
-	}
-#endif
 
 	pr_debug("%s:-\n", __func__);
 	return 0;
@@ -1067,12 +1019,6 @@ static int mdss_panel_parse_dt(struct device_node *np,
 		} else if (!strncmp(data, "bl_ctrl_dcs", 11)) {
 			ctrl_pdata->bklt_ctrl = BL_DCS_CMD;
 		}
-#ifdef CONFIG_MACH_SONY_FLAMINGO
-/*[Flamingo] LCM driver porting */
-		else {
-			ctrl_pdata ->bklt_ctrl = pinfo->bklt_ctrl;
-		}
-#endif
 	}
 	rc = of_property_read_u32(np, "qcom,mdss-brightness-max-level", &tmp);
 	pinfo->brightness_max = (!rc ? tmp : MDSS_MAX_BL_BRIGHTNESS);
@@ -1246,6 +1192,35 @@ error:
 	return -EINVAL;
 }
 
+static ssize_t mdss_dsi_panel_pcc_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	u32 r, g, b;
+
+	r = g = b = 0;
+
+	return scnprintf(buf, PAGE_SIZE, "0x%x 0x%x 0x%x ", r, g, b);
+}
+
+static struct device_attribute panel_attributes[] = {
+	__ATTR(cc, S_IRUGO, mdss_dsi_panel_pcc_show, NULL)
+};
+
+static int register_attributes(struct device *dev)
+{
+	int i;
+	for (i = 0; i < ARRAY_SIZE(panel_attributes); i++)
+		if (device_create_file(dev, panel_attributes + i))
+			goto error;
+	return 0;
+error:
+	dev_err(dev, "%s: Unable to create interface\n", __func__);
+	for (--i; i >= 0 ; i--)
+		device_remove_file(dev, panel_attributes + i);
+	return -ENODEV;
+}
+struct device virtdev;//[VVVV] JackBB 2014/6/9
+
 int mdss_dsi_panel_init(struct device_node *node,
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata,
 	bool cmd_cfg_cont_splash)
@@ -1253,6 +1228,7 @@ int mdss_dsi_panel_init(struct device_node *node,
 	int rc = 0;
 	static const char *panel_name;
 	struct mdss_panel_info *pinfo;
+	char *path_name = "mdss_dsi_panel";//[VVVV] JackBB 2014/6/9
 
 	if (!node || !ctrl_pdata) {
 		pr_err("%s: Invalid arguments\n", __func__);
@@ -1269,6 +1245,21 @@ int mdss_dsi_panel_init(struct device_node *node,
 	else
 		pr_info("%s: Panel Name = %s\n", __func__, panel_name);
 
+  //S [VVVV] JackBB 2014/6/9
+	dev_set_name(&virtdev, "%s", path_name);
+	rc = device_register(&virtdev);
+	if (rc) {
+		pr_err("%s: device_register rc = %d\n", __func__, rc);
+		//return rc;
+	}
+
+	rc = register_attributes(&virtdev);
+	if (rc) {
+		pr_err("%s: register_attributes rc = %d\n", __func__, rc);
+		//goto error;
+	}
+  //E [VVVV] JackBB 2014/6/9
+
 	rc = mdss_panel_parse_dt(node, ctrl_pdata);
 	if (rc) {
 		pr_err("%s:%d panel dt parse failed\n", __func__, __LINE__);
@@ -1280,16 +1271,6 @@ int mdss_dsi_panel_init(struct device_node *node,
 	pr_info("%s: Continuous splash %s", __func__,
 		pinfo->cont_splash_enabled ? "enabled" : "disabled");
 
-#ifdef CONFIG_MACH_SONY_FLAMINGO
-/*[Flamingo] LCM driver porting */
-	rc =gpio_request(TRULY_LCM_BL_EN,"BL EN PIN");
-	if (rc) {
-		pr_info("gpio15 request failed: %d\n", rc);
-	} else {
-		udelay(10);
-		msleep(1);
-	}
-#endif
 	pinfo->dynamic_switch_pending = false;
 	pinfo->is_lpm_mode = false;
 

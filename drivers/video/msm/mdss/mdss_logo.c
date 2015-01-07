@@ -30,7 +30,7 @@
 #define fb_width(fb)	((fb)->var.xres)
 #define fb_linewidth(fb) \
 	((fb)->fix.line_length / (fb_depth(fb) == 2 ? 2 : 4))
-#define fb_height(fb)	((fb)->var.yres)
+ #define fb_height(fb)	((fb)->var.yres)
 #define fb_depth(fb)	((fb)->var.bits_per_pixel >> 3)
 #define fb_size(fb)	(fb_width(fb) * fb_height(fb) * fb_depth(fb))
 #define INIT_IMAGE_FILE "/logo.rle"
@@ -201,7 +201,7 @@ int mdss_logo_close_write(struct file *file, const char __user *buffer, unsigned
 		printk(KERN_INFO "close logo.\n");
     fb_info->fbops->fb_pan_display(&fb_info->var, fb_info);
 		fb_info->fbops->fb_release(fb_info, 0);
-    b_draw_logo_flag = 0;
+    b_draw_logo_flag = 0;//[VVVV] JackBB 2014/06/24
 	}
 
   return count;
@@ -211,6 +211,8 @@ int __init logo_init(void)
 {
 	struct proc_dir_entry *proc_gpio;
 	
+  //return 0;//!!!!!!Temp Solution!!!!!! disable logo
+
 	if (!mdss_load_565rle_image(INIT_IMAGE_FILE))
 		draw_logo();
 
