@@ -207,22 +207,11 @@ int mdss_logo_close_write(struct file *file, const char __user *buffer, unsigned
   return count;
 }
 
-extern int is_quiet_reboot_flag(void);
-//quiet reboot
-
 int __init logo_init(void)
 {
 	struct proc_dir_entry *proc_gpio;
 	
   //return 0;//!!!!!!Temp Solution!!!!!! disable logo
-
-    //quiet reboot
-    if ( is_quiet_reboot_flag() == 1)
-    {
-        printk(KERN_INFO "quiet_reboot,so skip draw_logo()\n");
-        return 0;
-    }
-    //quiet reboot
 
 	if (!mdss_load_565rle_image(INIT_IMAGE_FILE))
 		draw_logo();

@@ -1174,9 +1174,6 @@ free_input_dev:
 	return rc;
 }
 
-//quiet reboot
-extern void set_quiet_reboot_flag(void);
-
 static int __devinit qpnp_pon_probe(struct spmi_device *spmi)
 {
 	struct qpnp_pon *pon;
@@ -1268,13 +1265,6 @@ static int __devinit qpnp_pon_probe(struct spmi_device *spmi)
 				"PMIC@SID%d: Power-off reason: %s\n",
 				pon->spmi->sid,
 				qpnp_poff_reason[index]);
-
-	//quiet reboot
-	if( index - 1 == 1 ) //"Triggered from SMPL (sudden momentary power loss)"
-	{
-		set_quiet_reboot_flag();
-	}
-	//quiet reboot
 
 	rc = of_property_read_u32(pon->spmi->dev.of_node,
 				"qcom,pon-dbc-delay", &delay);
