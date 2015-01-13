@@ -16,13 +16,13 @@
 #include <linux/iopoll.h>
 #include <linux/delay.h>
 #include <linux/dma-mapping.h>
-#include <linux/bootmem.h>
 #include <linux/memblock.h>
 
 #include "mdss_fb.h"
 #include "mdss_mdp.h"
 #include "mdss_panel.h"
 #include "mdss_debug.h"
+#include "mdss_mdp_trace.h"
 
 /* wait for at least 2 vsyncs for lowest refresh rate (24hz) */
 #define VSYNC_TIMEOUT_US 100000
@@ -333,6 +333,8 @@ static int mdss_mdp_video_stop(struct mdss_mdp_ctl *ctl)
 				frame_rate = 24;
 			msleep((1000/frame_rate) + 1);
 		}
+
+		mdss_iommu_ctrl(0);
 		mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF, false);
 		ctx->timegen_en = false;
 
@@ -345,6 +347,8 @@ static int mdss_mdp_video_stop(struct mdss_mdp_ctl *ctl)
 		if (sctl)
 			mdss_mdp_irq_disable(MDSS_MDP_IRQ_INTF_UNDER_RUN,
 				sctl->intf_num);
+
+		mdss_bus_bandwidth_ctrl(false);
 	}
 
 	list_for_each_entry_safe(handle, tmp, &ctx->vsync_handlers, list)
@@ -494,6 +498,7 @@ static void mdss_mdp_video_underrun_intr_done(void *arg)
 	ctl->underrun_cnt++;
 	MDSS_XLOG(ctl->num, ctl->underrun_cnt);
 	MDSS_XLOG_TOUT_HANDLER("mdp", "dsi0", "dsi1", "edp", "hdmi", "panic");
+	trace_mdp_video_underrun_done(ctl->num, ctl->underrun_cnt);
 	pr_debug("display underrun detected for ctl=%d count=%d\n", ctl->num,
 			ctl->underrun_cnt);
 
@@ -633,9 +638,19 @@ static int mdss_mdp_video_config_fps(struct mdss_mdp_ctl *ctl,
 				usecs_to_jiffies(VSYNC_TIMEOUT_US));
 			WARN(rc <= 0, "timeout (%d) vsync interrupt on ctl=%d\n",
 				rc, ctl->num);
-			rc = 0;
-			video_vsync_irq_disable(ctl);
 
+			video_vsync_irq_disable(ctl);
+			/* Do not configure fps on vsync timeout */
+			if (rc <= 0)
+				return rc;
+
+			if (mdss_mdp_video_line_count(ctl) >=
+					pdata->panel_info.yres/2) {
+				pr_err("Too few lines left line_cnt = %d y_res/2 = %d\n",
+					mdss_mdp_video_line_count(ctl),
+					pdata->panel_info.yres/2);
+				return -EPERM;
+			}
 			rc = mdss_mdp_video_vfp_fps_update(ctl, new_fps);
 			if (rc < 0) {
 				pr_err("%s: Error during DFPS\n", __func__);
@@ -674,6 +689,7 @@ static int mdss_mdp_video_display(struct mdss_mdp_ctl *ctl, void *arg)
 {
 	struct mdss_mdp_video_ctx *ctx;
 	struct mdss_mdp_ctl *sctl;
+	struct mdss_panel_data *pdata = ctl->panel_data;
 	int rc;
 
 	pr_debug("kickoff ctl=%d\n", ctl->num);
@@ -706,6 +722,18 @@ static int mdss_mdp_video_display(struct mdss_mdp_ctl *ctl, void *arg)
 
 		pr_debug("enabling timing gen for intf=%d\n", ctl->intf_num);
 
+		if (pdata->panel_info.cont_splash_enabled &&
+			!ctl->mfd->splash_info.splash_logo_enabled) {
+			rc = wait_for_completion_timeout(&ctx->vsync_comp,
+					usecs_to_jiffies(VSYNC_TIMEOUT_US));
+		}
+
+		rc = mdss_iommu_ctrl(1);
+		if (IS_ERR_VALUE(rc)) {
+			pr_err("IOMMU attach failed\n");
+			return rc;
+		}
+
 		mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON, false);
 
 		mdss_mdp_irq_enable(MDSS_MDP_IRQ_INTF_UNDER_RUN, ctl->intf_num);
@@ -713,6 +741,8 @@ static int mdss_mdp_video_display(struct mdss_mdp_ctl *ctl, void *arg)
 		if (sctl)
 			mdss_mdp_irq_enable(MDSS_MDP_IRQ_INTF_UNDER_RUN,
 				sctl->intf_num);
+
+		mdss_bus_bandwidth_ctrl(true);
 
 		mdp_video_write(ctx, MDSS_MDP_REG_INTF_TIMING_ENGINE_EN, 1);
 		wmb();
@@ -735,7 +765,6 @@ int mdss_mdp_video_reconfigure_splash_done(struct mdss_mdp_ctl *ctl,
 {
 	struct mdss_panel_data *pdata = ctl->panel_data;
 	int i, ret = 0;
-	struct mdss_overlay_private *mdp5_data = mfd_to_mdp5_data(ctl->mfd);
 	struct mdss_mdp_video_ctx *ctx;
 	struct mdss_data_type *mdata = ctl->mdata;
 
@@ -770,12 +799,6 @@ int mdss_mdp_video_reconfigure_splash_done(struct mdss_mdp_ctl *ctl,
 
 error:
 	pdata->panel_info.cont_splash_enabled = 0;
-
-	/* Give back the reserved memory to the system */
-	memblock_free(mdp5_data->splash_mem_addr, mdp5_data->splash_mem_size);
-	free_bootmem_late(mdp5_data->splash_mem_addr,
-				 mdp5_data->splash_mem_size);
-
 	return ret;
 }
 
