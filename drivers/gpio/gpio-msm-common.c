@@ -33,10 +33,6 @@
 #include <mach/mpm.h>
 #include "gpio-msm-common.h"
 
-#ifdef CONFIG_SONY_EAGLE
-#include <linux/suspend_resume_irq.h>
-#endif
-
 #ifdef CONFIG_GPIO_MSM_V3
 enum msm_tlmm_register {
 	SDC4_HDRV_PULL_CTL = 0x0, /* NOT USED */
@@ -379,11 +375,6 @@ void msm_gpio_show_resume_irq(void)
 		intstat = __msm_gpio_get_intr_status(i);
 		if (intstat) {
 			irq = msm_gpio_to_irq(&msm_gpio.gpio_chip, i);
-
-#ifdef CONFIG_SONY_EAGLE
-			suspned_resume_irq_write(irq);
-#endif
-
 			pr_warning("%s: %d triggered\n",
 				__func__, irq);
 		}
