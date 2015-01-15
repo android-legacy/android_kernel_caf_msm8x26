@@ -1,5 +1,4 @@
 /* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
- * Copyright (C) 2014 Sony Mobile Communications Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -23,8 +22,13 @@
 #define PC_CC_COLS             13
 
 #define PC_TEMP_ROWS		31
+/*[Bug ] S Jonny_Chan */
+#ifndef CONFIG_SONY_EAGLE
 #define PC_TEMP_COLS		8
-
+#else
+#define PC_TEMP_COLS		9
+#endif
+/*[Bug ] E Jonny_Chan */
 #define MAX_SINGLE_LUT_COLS	20
 
 #define MAX_BATT_ID_NUM		4
@@ -95,7 +99,6 @@ enum battery_vendor {
 	BATT_VENDOR_5TH,
 	BATT_VENDOR_NUM,
 };
-
 /**
  * struct bms_battery_data -
  * @fcc:		full charge capacity (mAmpHour)
@@ -151,6 +154,7 @@ struct bms_battery_data {
 	defined(CONFIG_QPNP_BMS)
 extern struct bms_battery_data  palladium_1500_data;
 extern struct bms_battery_data  desay_5200_data;
+extern struct bms_battery_data  oem_batt_data;
 extern struct bms_battery_data  *bms_batt_data;
 extern int bms_batt_data_num;
 extern struct bms_battery_data QRD_4v35_2000mAh_data;
