@@ -135,7 +135,6 @@ typedef enum
 #define IS_FW_IN_TX_PATH_FEATURE_ENABLE ((WDI_getHostWlanFeatCaps(FW_IN_TX_PATH)) & (WDA_getFwWlanFeatCaps(FW_IN_TX_PATH)))
 #define IS_MUMIMO_BFORMEE_CAPABLE ((WDI_getHostWlanFeatCaps(MU_MIMO)) & (WDA_getFwWlanFeatCaps(MU_MIMO)))
 #define IS_FEATURE_BCN_FLT_DELTA_ENABLE ((WDI_getHostWlanFeatCaps(BCN_IE_FLT_DELTA)) & (WDA_getFwWlanFeatCaps(BCN_IE_FLT_DELTA)))
-#define IS_FEATURE_FW_STATS_ENABLE ((WDI_getHostWlanFeatCaps(FW_STATS)) & (WDA_getFwWlanFeatCaps(FW_STATS)))
 /*--------------------------------------------------------------------------
   Utilities
  --------------------------------------------------------------------------*/
@@ -1210,8 +1209,6 @@ tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 #define WDA_HT40_OBSS_STOP_SCAN_IND SIR_HAL_HT40_OBSS_STOP_SCAN_IND
 
 #define WDA_GET_BCN_MISS_RATE_REQ        SIR_HAL_BCN_MISS_RATE_REQ
-#define WDA_ENCRYPT_MSG_REQ               SIR_HAL_ENCRYPT_MSG_REQ
-#define WDA_ENCRYPT_MSG_RSP               SIR_HAL_ENCRYPT_MSG_RSP
 
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS
 #define WDA_LINK_LAYER_STATS_CLEAR_REQ         SIR_HAL_LL_STATS_CLEAR_REQ
@@ -1225,8 +1222,6 @@ tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 #define WDA_SET_TDLS_CHAN_SWITCH_REQ           SIR_HAL_TDLS_CHAN_SWITCH_REQ
 #define WDA_SET_TDLS_CHAN_SWITCH_REQ_RSP       SIR_HAL_TDLS_CHAN_SWITCH_REQ_RSP
 #endif
-
-#define WDA_FW_STATS_GET_REQ                   SIR_HAL_FW_STATS_GET_REQ
 tSirRetStatus wdaPostCtrlMsg(tpAniSirGlobal pMac, tSirMsgQ *pMsg);
 
 eHalStatus WDA_SetRegDomain(void * clientCtxt, v_REGDOMAIN_t regId,
@@ -1258,7 +1253,6 @@ eHalStatus WDA_SetRegDomain(void * clientCtxt, v_REGDOMAIN_t regId,
 #endif /* WLAN_FEATURE_EXTSCAN */
 
 #define WDA_SPOOF_MAC_ADDR_REQ               SIR_HAL_SPOOF_MAC_ADDR_REQ
-#define WDA_SPOOF_MAC_ADDR_RSP               SIR_HAL_SPOOF_MAC_ADDR_RSP
 
 #define HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME 0x40 // Bit 6 will be used to control BD rate for Management frames
 

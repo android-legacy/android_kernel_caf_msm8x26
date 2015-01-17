@@ -351,6 +351,4 @@ eHalStatus csrCreateRoamScanChannelList(tpAniSirGlobal pMac,
 #endif
 void activeListCmdTimeoutHandle(void *userData);
 
-void csrGetStaticUapsdMask(tpAniSirGlobal pMac, tANI_U8 *staticUapsdMask);
-
 #endif //#if !defined( __SMEINSIDE_H )

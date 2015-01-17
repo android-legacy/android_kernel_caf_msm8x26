@@ -61,7 +61,6 @@
 #include "vos_trace.h"
 #include "vos_utils.h"
 #include "vos_memory.h"
-#include <linux/wcnss_wlan.h>
 
 #include <linux/err.h>
 #include <linux/random.h>
@@ -299,8 +298,6 @@ int hmac_sha1(v_U8_t *key, v_U8_t ksize, char *plaintext, v_U8_t psize,
     case -EBUSY:
         ret = wait_for_completion_interruptible(&tresult.completion);
         if (!ret && !tresult.err) {
-            for (i=0; i< outlen; i++)
-                output[i] = hash_result[i];
             INIT_COMPLETION(tresult.completion);
             break;
         } else {
@@ -456,10 +453,8 @@ int hmac_md5(v_U8_t *key, v_U8_t ksize, char *plaintext, v_U8_t psize,
         case -EBUSY:
              ret = wait_for_completion_interruptible(&tresult.completion);
              if (!ret && !tresult.err) {
-                 for (i=0; i< outlen; i++)
-                     output[i] = hash_result[i];
-                 INIT_COMPLETION(tresult.completion);
-                 break;
+                  INIT_COMPLETION(tresult.completion);
+                  break;
              } else {
                  VOS_TRACE(VOS_MODULE_ID_VOSS,VOS_TRACE_LEVEL_ERROR, "wait_for_completion_interruptible failed");
                  if (!ret)
@@ -725,14 +720,6 @@ v_U8_t vos_chan_to_band(v_U32_t chan)
         return VOS_BAND_2GHZ;
 
     return VOS_BAND_5GHZ;
-}
-
-void vos_get_wlan_unsafe_channel(v_U16_t *unsafeChannelList,
-                           v_U16_t buffer_size, v_U16_t *unsafeChannelCount)
-{
-    /* Get unsafe channel list from cached location */
-    wcnss_get_wlan_unsafe_channel(unsafeChannelList, buffer_size,
-                                  unsafeChannelCount);
 }
 
 #ifdef DEBUG_ROAM_DELAY

@@ -178,9 +178,9 @@ limProcessAuthFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo, tpPESession pse
     {
         // Received Auth frame from a BC/MC address
         // Log error and ignore it
-       limLog(pMac, LOGE,
-               FL("received Auth frame from a BC/MC address - "));
-       limPrintMacAddr(pMac, pHdr->sa, LOGE);
+        PELOGE(limLog(pMac, LOGE,
+               FL("received Auth frame from a BC/MC address - "));)
+       PELOG1( limPrintMacAddr(pMac, pHdr->sa, LOG1);)
 
         return;
     }
@@ -765,9 +765,8 @@ limProcessAuthFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo, tpPESession pse
                             return;
                         }
 
-                        limLog(pMac, LOG1,
-                               FL("Alloc new data: peer "MAC_ADDRESS_STR),
-                                                 MAC_ADDR_ARRAY(pHdr->sa));
+                        PELOG1(limLog(pMac, LOG1, FL("Alloc new data: %x peer "), pAuthNode);
+                        limPrintMacAddr(pMac, pHdr->sa, LOG1);)
 
                         vos_mem_copy((tANI_U8 *) pAuthNode->peerMacAddr,
                                       pHdr->sa,
@@ -886,9 +885,9 @@ limProcessAuthFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo, tpPESession pse
                             pAuthNode->fTimerStarted = 0;
                             limAddPreAuthNode(pMac, pAuthNode);
 
-                            limLog(pMac, LOG1,
-                                   FL("Alloc new data: id %d peer "MAC_ADDRESS_STR),
-                                    pAuthNode->authNodeIdx, MAC_ADDR_ARRAY(pHdr->sa));
+                            PELOG1(limLog(pMac, LOG1, FL("Alloc new data: %x id %d peer "),
+                                          pAuthNode, pAuthNode->authNodeIdx);)
+                            PELOG1(limPrintMacAddr(pMac, pHdr->sa, LOG1);)
 
                             /// Create and activate Auth Response timer
                             if (tx_timer_change_context(&pAuthNode->timer, pAuthNode->authNodeIdx) != TX_SUCCESS)
@@ -1033,10 +1032,10 @@ limProcessAuthFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo, tpPESession pse
                  */
 
                 // Log error
-                limLog(pMac, LOG1,
+                PELOG1(limLog(pMac, LOG1,
                        FL("received Auth frame2 from peer in state %d, addr "),
-                       psessionEntry->limMlmState);
-                limPrintMacAddr(pMac, pHdr->sa, LOG1);
+                       psessionEntry->limMlmState);)
+                PELOG1(limPrintMacAddr(pMac, pHdr->sa, LOG1);)
 
                 return;
             }
@@ -1116,9 +1115,8 @@ limProcessAuthFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo, tpPESession pse
                         return;
                     }
 
-                    limLog(pMac, LOG1,
-                              FL("Alloc new data: peer "MAC_ADDRESS_STR),
-                                                 MAC_ADDR_ARRAY(pHdr->sa));
+                    PELOG1(limLog(pMac, LOG1, FL("Alloc new data: %x peer "), pAuthNode);)
+                    PELOG1(limPrintMacAddr(pMac, pHdr->sa, LOG1);)
 
                     vos_mem_copy((tANI_U8 *) pAuthNode->peerMacAddr,
                                  pMac->lim.gpLimMlmAuthReq->peerMacAddr,
@@ -1580,10 +1578,10 @@ limProcessAuthFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo, tpPESession pse
                  */
 
                 // Log error
-                limLog(pMac, LOG1,
+                PELOG1(limLog(pMac, LOG1,
                        FL("received unexpected Auth frame4 from peer in state "
                        "%d, addr "MAC_ADDRESS_STR), psessionEntry->limMlmState,
-                       MAC_ADDR_ARRAY(pHdr->sa));
+                       MAC_ADDR_ARRAY(pHdr->sa));)
 
                 return;
             }
@@ -1661,9 +1659,8 @@ limProcessAuthFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo, tpPESession pse
 
                     return;
                 }
-                limLog(pMac, LOG1,
-                         FL("Alloc new data: peer " MAC_ADDRESS_STR),
-                                              MAC_ADDR_ARRAY(pHdr->sa));
+                PELOG1(limLog(pMac, LOG1, FL("Alloc new data: %x peer "), pAuthNode);
+                limPrintMacAddr(pMac, pHdr->sa, LOG1);)
 
                 vos_mem_copy((tANI_U8 *) pAuthNode->peerMacAddr,
                              pMac->lim.gpLimMlmAuthReq->peerMacAddr,

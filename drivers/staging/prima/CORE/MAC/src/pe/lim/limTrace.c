@@ -277,9 +277,6 @@ void macTraceMsgTx(tpAniSirGlobal pMac, tANI_U8 session, tANI_U32 data)
         case SIR_CFG_MODULE_ID:
             macTrace(pMac, TRACE_CODE_TX_CFG_MSG, session, data);
             break;
-        default:
-            macTrace(pMac, moduleId, session, data);
-            break;
     }
 }
 
@@ -302,9 +299,6 @@ void macTraceMsgTxNew(tpAniSirGlobal pMac, tANI_U8 module, tANI_U8 session, tANI
             break;
         case SIR_CFG_MODULE_ID:
             macTraceNew(pMac, module, TRACE_CODE_TX_CFG_MSG, session, data);
-            break;
-        default:
-            macTrace(pMac, moduleId, session, data);
             break;
         }
 }
@@ -332,9 +326,6 @@ void macTraceMsgRx(tpAniSirGlobal pMac, tANI_U8 session, tANI_U32 data)
             break;
         case SIR_CFG_MODULE_ID:
             macTrace(pMac, TRACE_CODE_RX_CFG_MSG, session, data);
-            break;
-        default:
-            macTrace(pMac, moduleId, session, data);
             break;
         }
 }
@@ -364,9 +355,6 @@ void macTraceMsgRxNew(tpAniSirGlobal pMac, tANI_U8 module, tANI_U8 session, tANI
             break;
         case SIR_CFG_MODULE_ID:
             macTraceNew(pMac, module, TRACE_CODE_RX_CFG_MSG, session, data);
-            break;
-        default:
-            macTrace(pMac, moduleId, session, data);
             break;
         }
 }

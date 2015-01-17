@@ -30,7 +30,6 @@
  *
  ******************************************************************************/
 #ifdef WLAN_LOGGING_SOCK_SVC_ENABLE
-#include <linux/rtc.h>
 #include <vmalloc.h>
 #include <wlan_nlink_srv.h>
 #include <vos_status.h>
@@ -51,6 +50,7 @@
 #define INVALID_PID -1
 
 #define MAX_LOGMSG_LENGTH 4096
+#define SECONDS_IN_A_DAY (86400)
 
 struct log_msg {
 	struct list_head node;
@@ -218,7 +218,6 @@ static void set_default_logtoapp_log_level(void)
 	vos_trace_setValue(VOS_MODULE_ID_HDD_SOFTAP, VOS_TRACE_LEVEL_ALL,
 			VOS_TRUE);
 	vos_trace_setValue(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ALL, VOS_TRUE);
-	vos_trace_setValue(VOS_MODULE_ID_PMC, VOS_TRACE_LEVEL_ALL, VOS_TRUE);
 }
 
 static void clear_default_logtoapp_log_level(void)
@@ -297,8 +296,6 @@ int wlan_log_to_user(VOS_TRACE_LEVEL log_level, char *to_be_sent, int length)
 	unsigned long flags;
 
 	struct timeval tv;
-	struct rtc_time tm;
-	unsigned long local_time;
 
 	if (gapp_pid == INVALID_PID) {
 		/*
@@ -312,26 +309,21 @@ int wlan_log_to_user(VOS_TRACE_LEVEL log_level, char *to_be_sent, int length)
 		pr_err("%s\n", to_be_sent);
 	}
 
-	/* Format the Log time [hr:min:sec.microsec] */
-	do_gettimeofday(&tv);
+	// wlan logging svc resources are not yet initialized
+	if (!gwlan_logging.pcur_node) {
+	    return -EIO;
+	}
 
-	/* Convert rtc to local time */
-	local_time = (u32)(tv.tv_sec - (sys_tz.tz_minuteswest * 60));
-	rtc_time_to_tm(local_time, &tm);
-	tlen = snprintf(tbuf, sizeof(tbuf), "[%s] [%02d:%02d:%02d.%06lu] ",
-			current->comm, tm.tm_hour, tm.tm_min, tm.tm_sec,
+	/* Format the Log time [Secondselapsedinaday.microseconds] */
+	do_gettimeofday(&tv);
+	tlen = snprintf(tbuf, sizeof(tbuf), "[%s][%5lu.%06lu] ", current->comm,
+			(unsigned long) (tv.tv_sec%SECONDS_IN_A_DAY),
 			tv.tv_usec);
 
 	/* 1+1 indicate '\n'+'\0' */
 	total_log_len = length + tlen + 1 + 1;
 
 	spin_lock_irqsave(&gwlan_logging.spin_lock, flags);
-
-	// wlan logging svc resources are not yet initialized
-	if (!gwlan_logging.pcur_node) {
-	    spin_unlock_irqrestore(&gwlan_logging.spin_lock, flags);
-	    return -EIO;
-	}
 
 	pfilled_length = &gwlan_logging.pcur_node->filled_length;
 

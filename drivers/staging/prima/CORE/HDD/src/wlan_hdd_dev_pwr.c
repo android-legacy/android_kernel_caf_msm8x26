@@ -47,7 +47,6 @@
  * Include Files
  * -------------------------------------------------------------------------*/
 #include <wlan_hdd_dev_pwr.h>
-#include <vos_sched.h>
 #ifdef ANI_BUS_TYPE_PLATFORM
 #include <linux/wcnss_wlan.h>
 #else
@@ -322,7 +321,7 @@ static void wlan_resume(hdd_context_t* pHddCtx)
    @return None
 
 ----------------------------------------------------------------------------*/
-int __hddDevSuspendHdlr(struct device *dev)
+int hddDevSuspendHdlr(struct device *dev)
 {
    int ret = 0;
    hdd_context_t* pHddCtx = NULL;
@@ -361,16 +360,6 @@ int __hddDevSuspendHdlr(struct device *dev)
    return 0;
 }
 
-int hddDevSuspendHdlr(struct device *dev)
-{
-    int ret;
-    vos_ssr_protect(__func__);
-    ret = __hddDevSuspendHdlr(dev);
-    vos_ssr_unprotect(__func__);
-
-    return ret;
-}
-
 /*----------------------------------------------------------------------------
 
    @brief Function to resume the wlan driver.
@@ -382,7 +371,7 @@ int hddDevSuspendHdlr(struct device *dev)
    @return None
 
 ----------------------------------------------------------------------------*/
-int __hddDevResumeHdlr(struct device *dev)
+int hddDevResumeHdlr(struct device *dev)
 {
    hdd_context_t* pHddCtx = NULL;
 
@@ -409,17 +398,6 @@ int __hddDevResumeHdlr(struct device *dev)
    return 0;
 }
 
-int hddDevResumeHdlr(struct device *dev)
-{
-    int ret;
-
-    vos_ssr_protect(__func__);
-    ret = __hddDevResumeHdlr(dev);
-    vos_ssr_unprotect(__func__);
-
-    return ret;
-}
-
 static const struct dev_pm_ops pm_ops = {
    .suspend = hddDevSuspendHdlr,
    .resume = hddDevResumeHdlr,
@@ -441,6 +419,7 @@ static const struct dev_pm_ops pm_ops = {
 ----------------------------------------------------------------------------*/
 VOS_STATUS hddRegisterPmOps(hdd_context_t *pHddCtx)
 {
+    wcnss_wlan_set_drvdata(pHddCtx->parent_dev, pHddCtx);
 #ifndef FEATURE_R33D
     wcnss_wlan_register_pm_ops(pHddCtx->parent_dev, &pm_ops);
 #endif /* FEATURE_R33D */
@@ -511,7 +490,7 @@ void hddDevTmTxBlockTimeoutHandler(void *usrData)
    pHddCtx->tmInfo.txFrameCount = 0;
 
    /* Resume TX flow */
-   hddLog(VOS_TRACE_LEVEL_INFO, FL("Enabling queues"));
+    
    netif_tx_wake_all_queues(staAdapater->dev);
    pHddCtx->tmInfo.qBlocked = VOS_FALSE;
    mutex_unlock(&pHddCtx->tmInfo.tmOperationLock);

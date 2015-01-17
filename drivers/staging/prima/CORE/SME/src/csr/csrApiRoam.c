@@ -265,7 +265,9 @@ void csrRoamReissueRoamCommand(tpAniSirGlobal pMac);
 #ifdef FEATURE_WLAN_BTAMP_UT_RF
 void csrRoamJoinRetryTimerHandler(void *pv);
 #endif
+#ifdef WLAN_FEATURE_TDLS
 void limInitOperatingClasses( tHalHandle hHal );
+#endif
 extern void SysProcessMmhMsg(tpAniSirGlobal pMac, tSirMsgQ* pMsg);
 extern void btampEstablishLogLinkHdlr(void* pMsg);
 static void csrSerDesUnpackDiassocRsp(tANI_U8 *pBuf, tSirSmeDisassocRsp *pRsp);
@@ -556,7 +558,9 @@ eHalStatus csrUpdateChannelList(tpAniSirGlobal pMac)
     vos_msg_t msg;
     tANI_U8 i;
 
+#ifdef WLAN_FEATURE_TDLS
     limInitOperatingClasses((tHalHandle)pMac);
+#endif
     numChan = sizeof(pMac->roam.validChannelList);
 
     if ( !HAL_STATUS_SUCCESS(csrGetCfgValidChannels(pMac,
@@ -1520,46 +1524,45 @@ ePhyChanBondState csrConvertCBIniValueToPhyCBState(v_U32_t cbIniValue)
    ePhyChanBondState phyCbState;
    switch (cbIniValue) {
       // secondary none
-      case eCSR_INI_SINGLE_CHANNEL_CENTERED:
+      case 0:
         phyCbState = PHY_SINGLE_CHANNEL_CENTERED;
         break;
       // secondary LOW
-      case eCSR_INI_DOUBLE_CHANNEL_HIGH_PRIMARY:
+      case 1:
         phyCbState = PHY_DOUBLE_CHANNEL_HIGH_PRIMARY;
         break;
       // secondary HIGH
-      case eCSR_INI_DOUBLE_CHANNEL_LOW_PRIMARY:
+      case 2:
         phyCbState = PHY_DOUBLE_CHANNEL_LOW_PRIMARY;
         break;
 #ifdef WLAN_FEATURE_11AC
-      case eCSR_INI_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_CENTERED:
-        phyCbState = PHY_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_CENTERED;
+      case 3:
+        phyCbState = PHY_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_CENTERED; 
         break;
-      case eCSR_INI_QUADRUPLE_CHANNEL_20MHZ_CENTERED_40MHZ_CENTERED:
+      case 4:
         phyCbState = PHY_QUADRUPLE_CHANNEL_20MHZ_CENTERED_40MHZ_CENTERED;
         break;
-      case eCSR_INI_QUADRUPLE_CHANNEL_20MHZ_HIGH_40MHZ_CENTERED:
-        phyCbState = PHY_QUADRUPLE_CHANNEL_20MHZ_HIGH_40MHZ_CENTERED;
-        break;
-      case eCSR_INI_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_LOW:
+      case 5:
+        phyCbState = PHY_QUADRUPLE_CHANNEL_20MHZ_CENTERED_40MHZ_CENTERED;
+        break; 
+      case 6:
         phyCbState = PHY_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_LOW;
         break;
-      case eCSR_INI_QUADRUPLE_CHANNEL_20MHZ_HIGH_40MHZ_LOW:
+      case 7:
         phyCbState = PHY_QUADRUPLE_CHANNEL_20MHZ_HIGH_40MHZ_LOW;
-        break;
-      case eCSR_INI_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_HIGH:
+        break; 
+      case 8:
         phyCbState = PHY_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_HIGH;
         break;
-      case eCSR_INI_QUADRUPLE_CHANNEL_20MHZ_HIGH_40MHZ_HIGH:
+      case 9:
         phyCbState = PHY_QUADRUPLE_CHANNEL_20MHZ_HIGH_40MHZ_HIGH;
-        break;
-#endif
+        break; 
+#endif 
       default:
         // If an invalid value is passed, disable CHANNEL BONDING
         phyCbState = PHY_SINGLE_CHANNEL_CENTERED;
         break;
    }
-
    return phyCbState;
 }
 
@@ -1570,45 +1573,44 @@ v_U32_t csrConvertPhyCBStateToIniValue(ePhyChanBondState phyCbState)
    switch (phyCbState) {
       // secondary none
       case PHY_SINGLE_CHANNEL_CENTERED:
-        cbIniValue = eCSR_INI_SINGLE_CHANNEL_CENTERED;
+        cbIniValue = 0;
         break;
       // secondary LOW
       case PHY_DOUBLE_CHANNEL_HIGH_PRIMARY:
-        cbIniValue = eCSR_INI_DOUBLE_CHANNEL_HIGH_PRIMARY;
+        cbIniValue = 1;
         break;
       // secondary HIGH
       case PHY_DOUBLE_CHANNEL_LOW_PRIMARY:
-        cbIniValue = eCSR_INI_DOUBLE_CHANNEL_LOW_PRIMARY;
+        cbIniValue = 2;
         break;
 #ifdef WLAN_FEATURE_11AC
       case PHY_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_CENTERED:
-        cbIniValue = eCSR_INI_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_CENTERED;
+        cbIniValue = 3;
         break;
       case PHY_QUADRUPLE_CHANNEL_20MHZ_CENTERED_40MHZ_CENTERED:
-        cbIniValue = eCSR_INI_QUADRUPLE_CHANNEL_20MHZ_CENTERED_40MHZ_CENTERED;
+        cbIniValue = 4;
         break;
       case PHY_QUADRUPLE_CHANNEL_20MHZ_HIGH_40MHZ_CENTERED:
-        cbIniValue = eCSR_INI_QUADRUPLE_CHANNEL_20MHZ_HIGH_40MHZ_CENTERED;
+        cbIniValue = 5;
         break;
       case PHY_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_LOW:
-        cbIniValue = eCSR_INI_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_LOW;
+        cbIniValue = 6;
         break;
       case PHY_QUADRUPLE_CHANNEL_20MHZ_HIGH_40MHZ_LOW:
-        cbIniValue = eCSR_INI_QUADRUPLE_CHANNEL_20MHZ_HIGH_40MHZ_LOW;
+        cbIniValue = 7;
         break;
       case PHY_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_HIGH:
-        cbIniValue = eCSR_INI_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_HIGH;
+        cbIniValue = 8;
         break;
       case PHY_QUADRUPLE_CHANNEL_20MHZ_HIGH_40MHZ_HIGH:
-        cbIniValue = eCSR_INI_QUADRUPLE_CHANNEL_20MHZ_HIGH_40MHZ_HIGH;
+        cbIniValue = 9;
         break;
 #endif
       default:
         // return some invalid value
-        cbIniValue = eCSR_INI_CHANNEL_BONDING_STATE_MAX;
+        cbIniValue = 10;
         break;
    }
-
    return cbIniValue;
 }
 
@@ -1641,9 +1643,6 @@ eHalStatus csrChangeDefaultConfigParam(tpAniSirGlobal pMac, tCsrConfigParam *pPa
         {
             smsLog( pMac, LOGW, "Invalid CB value from ini in 5GHz band %d, CB DISABLED", pParam->channelBondingMode5GHz);
         }
-#ifdef WLAN_FEATURE_AP_HT40_24G
-        pMac->roam.configParam.channelBondingAPMode24GHz = csrConvertCBIniValueToPhyCBState(pParam->channelBondingAPMode24GHz);
-#endif
         pMac->roam.configParam.channelBondingMode5GHz = csrConvertCBIniValueToPhyCBState(pParam->channelBondingMode5GHz);
         pMac->roam.configParam.RTSThreshold = pParam->RTSThreshold;
         pMac->roam.configParam.phyMode = pParam->phyMode;
@@ -1688,13 +1687,6 @@ eHalStatus csrChangeDefaultConfigParam(tpAniSirGlobal pMac, tCsrConfigParam *pPa
             pMac->roam.configParam.nPassiveMinChnTime = pParam->nPassiveMinChnTime;
             cfgSetInt(pMac, WNI_CFG_PASSIVE_MINIMUM_CHANNEL_TIME,
                       pParam->nPassiveMinChnTime);
-        }
-        if (pParam->nOBSSScanWidthTriggerInterval)
-        {
-            pMac->roam.configParam.nOBSSScanWidthTriggerInterval =
-                                   pParam->nOBSSScanWidthTriggerInterval;
-            cfgSetInt(pMac, WNI_CFG_OBSS_HT40_SCAN_WIDTH_TRIGGER_INTERVAL,
-                      pParam->nOBSSScanWidthTriggerInterval);
         }
         if (pParam->nActiveMaxChnTimeBtc)
         {
@@ -1900,10 +1892,6 @@ eHalStatus csrChangeDefaultConfigParam(tpAniSirGlobal pMac, tCsrConfigParam *pPa
                                pParam->isCoalesingInIBSSAllowed;
         pMac->roam.configParam.allowDFSChannelRoam = pParam->allowDFSChannelRoam;
         pMac->roam.configParam.sendDeauthBeforeCon = pParam->sendDeauthBeforeCon;
-#ifdef WLAN_FEATURE_AP_HT40_24G
-        pMac->roam.configParam.apHT40_24GEnabled = pParam->apHT40_24GEnabled;
-#endif
-
     }
     
     return status;
@@ -1921,9 +1909,6 @@ eHalStatus csrGetConfigParam(tpAniSirGlobal pMac, tCsrConfigParam *pParam)
         pParam->Is11dSupportEnabledOriginal = pMac->roam.configParam.Is11dSupportEnabledOriginal;
         pParam->Is11hSupportEnabled = pMac->roam.configParam.Is11hSupportEnabled;
         pParam->channelBondingMode24GHz = csrConvertPhyCBStateToIniValue(pMac->roam.configParam.channelBondingMode24GHz);
-#ifdef WLAN_FEATURE_AP_HT40_24G
-        pParam->channelBondingAPMode24GHz = csrConvertPhyCBStateToIniValue(pMac->roam.configParam.channelBondingAPMode24GHz);
-#endif
         pParam->channelBondingMode5GHz = csrConvertPhyCBStateToIniValue(pMac->roam.configParam.channelBondingMode5GHz);
         pParam->RTSThreshold = pMac->roam.configParam.RTSThreshold;
         pParam->phyMode = pMac->roam.configParam.phyMode;
@@ -2049,9 +2034,6 @@ eHalStatus csrGetConfigParam(tpAniSirGlobal pMac, tCsrConfigParam *pParam)
                                     pMac->roam.configParam.allowDFSChannelRoam;
         pParam->sendDeauthBeforeCon = pMac->roam.configParam.sendDeauthBeforeCon;
         csrSetChannels(pMac, pParam);
-#ifdef WLAN_FEATURE_AP_HT40_24G
-        pParam->apHT40_24GEnabled = pMac->roam.configParam.apHT40_24GEnabled;
-#endif
 
         status = eHAL_STATUS_SUCCESS;
     }
@@ -2325,7 +2307,9 @@ eHalStatus csrInitChannelList( tHalHandle hHal )
     csrSaveChannelPowerForBand(pMac, eANI_BOOLEAN_TRUE);
     // Apply the base channel list, power info, and set the Country code...
     csrApplyChannelPowerCountryInfo( pMac, &pMac->scan.base20MHzChannels, pMac->scan.countryCodeCurrent, eANI_BOOLEAN_TRUE );
+#ifdef WLAN_FEATURE_TDLS
     limInitOperatingClasses(hHal);
+#endif
     return (status);
 }
 eHalStatus csrChangeConfigParams(tpAniSirGlobal pMac, 
@@ -3496,13 +3480,12 @@ eHalStatus csrSetQosToCfg( tpAniSirGlobal pMac, tANI_U32 sessionId, eCsrMediaAcc
     return (status);
 }
 static eHalStatus csrGetRateSet( tpAniSirGlobal pMac,  tCsrRoamProfile *pProfile, eCsrPhyMode phyMode, tSirBssDescription *pBssDesc,
-                           tDot11fBeaconIEs *pIes, tSirMacRateSet *pOpRateSet, tSirMacRateSet *pExRateSet, tANI_U16 *pRateBitmap)
+                           tDot11fBeaconIEs *pIes, tSirMacRateSet *pOpRateSet, tSirMacRateSet *pExRateSet)
 {
     eHalStatus status = eHAL_STATUS_FAILURE;
     int i;
     eCsrCfgDot11Mode cfgDot11Mode;
     tANI_U8 *pDstRate;
-    tANI_U16 rateBitmap = 0;
     vos_mem_set(pOpRateSet, sizeof(tSirMacRateSet), 0);
     vos_mem_set(pExRateSet, sizeof(tSirMacRateSet), 0);
     VOS_ASSERT( pIes != NULL );
@@ -3526,7 +3509,6 @@ static eHalStatus csrGetRateSet( tpAniSirGlobal pMac,  tCsrRoamProfile *pProfile
             {
                 if ( csrRatesIsDot11RateSupported( pMac, pIes->SuppRates.rates[ i ] ) ) 
                 {
-                    csrAddRateBitmap(pIes->SuppRates.rates[ i ], &rateBitmap);
                     *pDstRate++ = pIes->SuppRates.rates[ i ];
                     pOpRateSet->numRates++;
                 }
@@ -3547,17 +3529,12 @@ static eHalStatus csrGetRateSet( tpAniSirGlobal pMac,  tCsrRoamProfile *pProfile
                 {
                     if ( csrRatesIsDot11RateSupported( pMac, pIes->ExtSuppRates.rates[ i ] ) ) 
                     {
-                        if (!csrIsRateAlreadyPresent(pIes->ExtSuppRates.rates[ i ], rateBitmap))
-                        {
-                            csrAddRateBitmap(pIes->ExtSuppRates.rates[ i ], &rateBitmap);
-                            *pDstRate++ = pIes->ExtSuppRates.rates[ i ];
-                            pExRateSet->numRates++;
-                        }
+                        *pDstRate++ = pIes->ExtSuppRates.rates[ i ];
+                        pExRateSet->numRates++;
                     }
                 }
             }
         }
-        *pRateBitmap = rateBitmap;
     }//Parsing BSSDesc
     else
     {
@@ -5144,11 +5121,12 @@ static eHalStatus csrRoamSaveSecurityRspIE(tpAniSirGlobal pMac, tANI_U32 session
                                    pIesLocal->WAPI.multicast_cipher_suite + 4,
                                    2);
                       pIeBuf += 2;
-                      if ( pIesLocal->WAPI.bkid_count )
+                      //bkid_count
+                      vos_mem_copy(pIeBuf, &pIesLocal->WAPI.bkid_count, 2);
+
+                      pIeBuf += 2;
+                      if( pIesLocal->WAPI.bkid_count )
                       {
-                         //bkid_count
-                         vos_mem_copy(pIeBuf, &pIesLocal->WAPI.bkid_count, 2);
-                         pIeBuf += 2;
                          //copy akm_suites
                          vos_mem_copy(pIeBuf, pIesLocal->WAPI.bkid,
                                       pIesLocal->WAPI.bkid_count * 4);
@@ -6424,12 +6402,6 @@ eHalStatus csrRoamCopyConnectedProfile(tpAniSirGlobal pMac, tANI_U32 sessionId, 
         pDstProfile->CBMode = pSrcProfile->CBMode;
         vos_mem_copy(&pDstProfile->Keys, &pSrcProfile->Keys,
                      sizeof(pDstProfile->Keys));
-#ifdef WLAN_FEATURE_11W
-        pDstProfile->MFPEnabled = pSrcProfile->MFPEnabled;
-        pDstProfile->MFPRequired = pSrcProfile->MFPRequired;
-        pDstProfile->MFPCapable = pSrcProfile->MFPCapable;
-#endif
-
 #ifdef WLAN_FEATURE_VOWIFI_11R
         if (pSrcProfile->MDID.mdiePresent)
         {
@@ -7369,12 +7341,6 @@ eHalStatus csrRoamSaveConnectedInfomation(tpAniSirGlobal pMac, tANI_U32 sessionI
         vos_mem_copy(pConnectProfile->pAddIEAssoc, pProfile->pAddIEAssoc,
                      pProfile->nAddIEAssocLength);
     }
-
-#ifdef WLAN_FEATURE_11W
-    pConnectProfile->MFPEnabled = pProfile->MFPEnabled;
-    pConnectProfile->MFPRequired = pProfile->MFPRequired;
-    pConnectProfile->MFPCapable = pProfile->MFPCapable;
-#endif
     
     //Save bssid
     csrGetBssIdBssDesc(pMac, pSirBssDesc, &pConnectProfile->bssid);
@@ -8565,12 +8531,6 @@ void csrRoamJoinedStateMsgProcessor( tpAniSirGlobal pMac, void *pMsgBuf )
             vos_mem_copy(&pRoamInfo->bssid, pUpperLayerAssocCnf->bssId,
                          sizeof(tCsrBssid));
             pRoamInfo->wmmEnabledSta = pUpperLayerAssocCnf->wmmEnabledSta;
-#ifdef WLAN_FEATURE_AP_HT40_24G
-            pRoamInfo->HT40MHzIntoEnabledSta =
-                       pUpperLayerAssocCnf->HT40MHzIntoEnabledSta;
-            smsLog( pMac, LOGW, FL("HT40MHzIntoEnabledSta: %d \n"),
-                                    pRoamInfo->HT40MHzIntoEnabledSta);
-#endif
             if(CSR_IS_INFRA_AP(pRoamInfo->u.pConnectedProfile) )
             {
                 pMac->roam.roamSession[sessionId].connectState = eCSR_ASSOC_STATE_TYPE_INFRA_CONNECTED;
@@ -9522,12 +9482,6 @@ void csrRoamCheckForLinkStatusChange( tpAniSirGlobal pMac, tSirSmeRsp *pSirMsg )
                     vos_mem_copy(&pRoamInfo->bssid, pAssocInd->bssId,
                                  sizeof(tCsrBssid));
                     pRoamInfo->wmmEnabledSta = pAssocInd->wmmEnabledSta;
-#ifdef WLAN_FEATURE_AP_HT40_24G
-                    pRoamInfo->HT40MHzIntoEnabledSta =
-                               pAssocInd->HT40MHzIntoEnabledSta;
-                    smsLog(pMac, LOGW, FL("HT40MHzIntoEnabledSta: %d \n"),
-                                       pRoamInfo->HT40MHzIntoEnabledSta);
-#endif
                     if(CSR_IS_WDS_AP( pRoamInfo->u.pConnectedProfile))
                         status = csrRoamCallCallback(pMac, sessionId, pRoamInfo, 0, eCSR_ROAM_WDS_IND, eCSR_ROAM_RESULT_WDS_ASSOCIATION_IND);//Sta
                     if(CSR_IS_INFRA_AP(pRoamInfo->u.pConnectedProfile))
@@ -10815,13 +10769,9 @@ eHalStatus csrRoamLostLink( tpAniSirGlobal pMac, tANI_U32 sessionId, tANI_U32 ty
         pDeauthIndMsg = (tSirSmeDeauthInd *)pSirMsg;
         pSession->roamingStatusCode = pDeauthIndMsg->statusCode;
         /* Convert into proper reason code */
-        if ((pDeauthIndMsg->reasonCode == eSIR_BEACON_MISSED) ||
-                (pDeauthIndMsg->reasonCode ==
-                 eSIR_MAC_DISASSOC_DUE_TO_INACTIVITY_REASON))
-            pSession->joinFailStatusCode.reasonCode = 0;
-        else
-            pSession->joinFailStatusCode.reasonCode = pDeauthIndMsg->reasonCode;
-
+        pSession->joinFailStatusCode.reasonCode =
+                (pDeauthIndMsg->reasonCode == eSIR_BEACON_MISSED) ?
+                0 : pDeauthIndMsg->reasonCode;
        /* cfg layer expects 0 as reason code if
           the driver dosent know the reason code
           eSIR_BEACON_MISSED is defined as locally */
@@ -11482,11 +11432,6 @@ tANI_BOOLEAN csrRoamIsValid40MhzChannel(tpAniSirGlobal pMac, tANI_U8 channel)
                     smsLog(pMac, LOGE, "  Invalid center channel (%d), disable 40MHz mode", centerChn);
                     eRet = PHY_SINGLE_CHANNEL_CENTERED;
                 }
-                if ((CSR_IS_CHANNEL_24GHZ(primaryChn))&& !IS_HT40_OBSS_SCAN_FEATURE_ENABLE)
-                {
-                    smsLog(pMac, LOG1,FL("FW doesn't support channelBondingMode24GHz"));
-                    eRet = PHY_SINGLE_CHANNEL_CENTERED;
-                }
             }
         }
     }
@@ -12082,14 +12027,10 @@ static void csrRoamPrepareBssParams(tpAniSirGlobal pMac, tANI_U32 sessionId, tCs
         {
             if(CSR_IS_CHANNEL_24GHZ(Channel) )
             {
-#ifdef WLAN_FEATURE_AP_HT40_24G
-                if (CSR_IS_INFRA_AP(pProfile))
-                    cbMode = pMac->roam.configParam.channelBondingAPMode24GHz;
-                else
-                    cbMode = PHY_SINGLE_CHANNEL_CENTERED;
-#else
+                /* TODO- SAP: HT40 Support in SAP 2.4Ghz mode is not enabled.
+                    so channel bonding in 2.4Ghz is configured as 20MHZ
+                    irrespective of the 'channelBondingMode24GHz' Parameter */
                 cbMode = PHY_SINGLE_CHANNEL_CENTERED;
-#endif
             }
             else
             {
@@ -12287,40 +12228,44 @@ eHalStatus csrRoamSetPMKIDCache( tpAniSirGlobal pMac, tANI_U32 sessionId,
 #endif//FEATURE_WLAN_DIAG_SUPPORT_CSR
         status = eHAL_STATUS_SUCCESS;
         if (update_entire_cache) {
+            pSession->NumPmkidCache = (tANI_U16)numItems;
             if (numItems && pPMKIDCache)
             {
-                pSession->NumPmkidCache = (tANI_U16)numItems;
                 vos_mem_copy(pSession->PmkidCacheInfo, pPMKIDCache,
                              sizeof(tPmkidCacheInfo) * numItems);
-                pSession->CurCacheIndex = (tANI_U16)numItems;
             }
         } else {
-            tANI_U32 i = 0;
+            tANI_U32 i = 0, j = 0;
+            tANI_U8 BSSIDMatched = 0;
             tPmkidCacheInfo *pmksa;
 
             for (i = 0; i < numItems; i++) {
                 pmksa = &pPMKIDCache[i];
+                for (j = 0; j < CSR_MAX_PMKID_ALLOWED; j++) {
+                    if (vos_mem_compare(pSession->PmkidCacheInfo[j].BSSID,
+                        pmksa->BSSID, VOS_MAC_ADDR_SIZE)) {
+                        /* If a matching BSSID found, update it */
+                        BSSIDMatched = 1;
+                        vos_mem_copy(pSession->PmkidCacheInfo[j].PMKID,
+                                     pmksa->PMKID, CSR_RSN_PMKID_SIZE);
+                        break;
+                    }
+                }
 
-                /* Delete the entry if present */
-                csrRoamDelPMKIDfromCache(pMac,sessionId,pmksa->BSSID,FALSE);
-
-                /* Add entry to the cache */
-                vos_mem_copy(
-                   pSession->PmkidCacheInfo[pSession->CurCacheIndex].BSSID,
-                   pmksa->BSSID, VOS_MAC_ADDR_SIZE);
-                vos_mem_copy(
-                   pSession->PmkidCacheInfo[pSession->CurCacheIndex].PMKID,
-                   pmksa->PMKID, CSR_RSN_PMKID_SIZE);
-
-                /* Increment the CSR local cache index */
-                if (pSession->CurCacheIndex < (CSR_MAX_PMKID_ALLOWED - 1))
-                    pSession->CurCacheIndex++;
-                else
-                    pSession->CurCacheIndex = 0;
-
-                pSession->NumPmkidCache++;
-                if(pSession->NumPmkidCache > CSR_MAX_PMKID_ALLOWED)
-                    pSession->NumPmkidCache = CSR_MAX_PMKID_ALLOWED;
+                if (!BSSIDMatched) {
+                    vos_mem_copy(
+                       pSession->PmkidCacheInfo[pSession->NumPmkidCache].BSSID,
+                       pmksa->BSSID, VOS_MAC_ADDR_SIZE);
+                    vos_mem_copy(
+                       pSession->PmkidCacheInfo[pSession->NumPmkidCache].PMKID,
+                       pmksa->PMKID, CSR_RSN_PMKID_SIZE);
+                    /* Increment the CSR local cache index */
+                    if (pSession->NumPmkidCache < (CSR_MAX_PMKID_ALLOWED - 1))
+                        pSession->NumPmkidCache++;
+                    else
+                        pSession->NumPmkidCache = 0;
+                }
+                BSSIDMatched = 0;
             }
         }
     }
@@ -12331,11 +12276,10 @@ eHalStatus csrRoamDelPMKIDfromCache( tpAniSirGlobal pMac, tANI_U32 sessionId,
                                      tANI_U8 *pBSSId,
                                      tANI_BOOLEAN flush_cache )
 {
+    eHalStatus status = eHAL_STATUS_FAILURE;
     tCsrRoamSession *pSession = CSR_GET_SESSION( pMac, sessionId );
     tANI_BOOLEAN fMatchFound = FALSE;
     tANI_U32 Index;
-    tANI_U32 CurIndex;
-    tANI_U32 i;
 
     if(!pSession)
     {
@@ -12358,6 +12302,7 @@ eHalStatus csrRoamDelPMKIDfromCache( tpAniSirGlobal pMac, tANI_U32 sessionId,
                 /* Clear this - the matched entry */
                 vos_mem_zero(&pSession->PmkidCacheInfo[Index],
                              sizeof(tPmkidCacheInfo));
+                status = eHAL_STATUS_SUCCESS;
                 break;
             }
         }
@@ -12365,37 +12310,17 @@ eHalStatus csrRoamDelPMKIDfromCache( tpAniSirGlobal pMac, tANI_U32 sessionId,
         if (Index == CSR_MAX_PMKID_ALLOWED && !fMatchFound) {
             smsLog(pMac, LOG1, FL("No such PMKSA entry exists "MAC_ADDRESS_STR),
                    MAC_ADDR_ARRAY(pBSSId));
+            return status;
         }
-        else {
-            /* Match Found */
-            CurIndex = pSession->CurCacheIndex;
-            if(Index < CurIndex) {
-                for(i = Index; i < (CurIndex-1); i++) {
-                    vos_mem_copy(&pSession->PmkidCacheInfo[i],
-                        &pSession->PmkidCacheInfo[i+1],sizeof(tPmkidCacheInfo));
-                }
-                pSession->CurCacheIndex--;
-                vos_mem_zero(&pSession->PmkidCacheInfo[pSession->CurCacheIndex],
-                    sizeof(tPmkidCacheInfo));
-            } else if(Index > CurIndex) {
-                for(i = Index; i > (CurIndex); i--) {
-                    vos_mem_copy(&pSession->PmkidCacheInfo[i],
-                        &pSession->PmkidCacheInfo[i-1],sizeof(tPmkidCacheInfo));
-                }
-                vos_mem_zero(&pSession->PmkidCacheInfo[pSession->CurCacheIndex],
-                    sizeof(tPmkidCacheInfo));
-            }
-            pSession->NumPmkidCache--;
-        }
+
+        return status;
     } else {
         /* Flush the entire cache */
         vos_mem_zero(pSession->PmkidCacheInfo,
                      sizeof(tPmkidCacheInfo) * CSR_MAX_PMKID_ALLOWED);
         pSession->NumPmkidCache = 0;
-        pSession->CurCacheIndex = 0;
+        return eHAL_STATUS_SUCCESS;
     }
-
-    return eHAL_STATUS_SUCCESS;
 }
 
 tANI_U32 csrRoamGetNumPMKIDCache(tpAniSirGlobal pMac, tANI_U32 sessionId)
@@ -12407,8 +12332,6 @@ eHalStatus csrRoamGetPMKIDCache(tpAniSirGlobal pMac, tANI_U32 sessionId, tANI_U3
 {
     eHalStatus status = eHAL_STATUS_INVALID_PARAMETER;
     tCsrRoamSession *pSession = CSR_GET_SESSION( pMac, sessionId );
-    tPmkidCacheInfo *pmksa;
-    tANI_U16 i,j;
 
     if(!pSession)
     {
@@ -12431,16 +12354,8 @@ eHalStatus csrRoamGetPMKIDCache(tpAniSirGlobal pMac, tANI_U32 sessionId, tANI_U3
                   pSession->NumPmkidCache);
                 pSession->NumPmkidCache = CSR_MAX_PMKID_ALLOWED;
             }
-
-            for(i = 0,j = 0; (j<pSession->NumPmkidCache)&&(i<CSR_MAX_PMKID_ALLOWED); i++) {
-                pmksa = &pSession->PmkidCacheInfo[i];
-                if(!csrIsMacAddressZero(pMac, &pmksa->BSSID)) {
-                    vos_mem_copy(pPmkidCache,pmksa,sizeof(tPmkidCacheInfo));
-                    pPmkidCache++;
-                    j++;
-                }
-            }
-
+            vos_mem_copy(pPmkidCache, pSession->PmkidCacheInfo,
+                         sizeof(tPmkidCacheInfo) * pSession->NumPmkidCache);
             *pNum = pSession->NumPmkidCache;
             status = eHAL_STATUS_SUCCESS;
         }
@@ -12873,7 +12788,6 @@ eHalStatus csrSendJoinReqMsg( tpAniSirGlobal pMac, tANI_U32 sessionId, tSirBssDe
     tANI_U8 wpaRsnIE[DOT11F_IE_RSN_MAX_LEN];    //RSN MAX is bigger than WPA MAX
     tANI_U32 ucDot11Mode = 0;
     tANI_U8 txBFCsnValue = 0;
-    tANI_U16 rateBitmap = 0;
 
     if(!pSession)
     {
@@ -12969,7 +12883,7 @@ eHalStatus csrSendJoinReqMsg( tpAniSirGlobal pMac, tANI_U32 sessionId, tSirBssDe
 
 
 
-        status = csrGetRateSet(pMac, pProfile, (eCsrPhyMode)pProfile->phyMode, pBssDescription, pIes, &OpRateSet, &ExRateSet,&rateBitmap);
+        status = csrGetRateSet(pMac, pProfile, (eCsrPhyMode)pProfile->phyMode, pBssDescription, pIes, &OpRateSet, &ExRateSet);
         if (HAL_STATUS_SUCCESS(status) )
         {
             // OperationalRateSet
@@ -12990,11 +12904,6 @@ eHalStatus csrSendJoinReqMsg( tpAniSirGlobal pMac, tANI_U32 sessionId, tSirBssDe
             *pBuf++ = 0;
             *pBuf++ = 0;
         }
-
-        //rateBitmap
-        vos_mem_copy(pBuf, &rateBitmap, sizeof(tANI_U16));
-        pBuf += sizeof(tANI_U16);
-
         // rsnIE
         if ( csrIsProfileWpa( pProfile ) )
         {
@@ -13766,58 +13675,6 @@ csrSendChngMCCBeaconInterval(tpAniSirGlobal pMac, tANI_U32 sessionId)
      return status;
 }
 
-#ifdef WLAN_FEATURE_AP_HT40_24G
-eHalStatus csrSetHT2040Mode(tpAniSirGlobal pMac, tANI_U32 sessionId, tANI_U8 cbMode)
-{
-    tpSirSetHT2040Mode pMsg;
-    tANI_U16 len = 0;
-    eHalStatus status   = eHAL_STATUS_SUCCESS;
-    tCsrRoamSession *pSession = CSR_GET_SESSION( pMac, sessionId );
-
-    if(!pSession)
-    {
-        smsLog(pMac, LOGE, FL("  session %d not found "), sessionId);
-        return eHAL_STATUS_FAILURE;
-    }
-
-     /* Create the message and send to lim */
-     len = sizeof(tSirSetHT2040Mode);
-     pMsg = vos_mem_malloc(len);
-
-     if ( NULL == pMsg )
-     {
-         smsLog( pMac, LOGE, FL("Memory Allocation Fail !!!"));
-         status = eHAL_STATUS_FAILURE;
-     }
-     else
-         status = eHAL_STATUS_SUCCESS;
-
-     if(HAL_STATUS_SUCCESS(status))
-     {
-         vos_mem_set(pMsg, sizeof(tSirSetHT2040Mode), 0);
-         pMsg->messageType     = eWNI_SME_SET_HT_2040_MODE;
-         pMsg->length          = len;
-
-        // bssId
-        vos_mem_copy((tSirMacAddr *)pMsg->bssId, &pSession->selfMacAddr,
-                     sizeof(tSirMacAddr));
-
-        smsLog( pMac, LOGW, FL("CSR Attempting to set "
-                      "HT20/40 mode for Bssid= "MAC_ADDRESS_STR),
-                      MAC_ADDR_ARRAY(pMsg->bssId));
-
-        pMsg->sessionId = sessionId;
-        pMsg->cbMode    = cbMode;
-
-        smsLog(pMac, LOGW, FL("session %d Channel Bonding: %d"),
-                                               sessionId, cbMode);
-
-        status = palSendMBMessage(pMac->hHdd, pMsg);
-     }
-     return status;
-}
-#endif
-
 eHalStatus csrSendMBDeauthReqMsg( tpAniSirGlobal pMac, tANI_U32 sessionId, tSirMacAddr bssId, tANI_U16 reasonCode )
 {
     eHalStatus status = eHAL_STATUS_SUCCESS;
@@ -14068,11 +13925,6 @@ eHalStatus csrSendAssocIndToUpperLayerCnfMsg(   tpAniSirGlobal pMac,
         //reassocReq
         *pBuf = pAssocInd->reassocReq;
         pBuf += sizeof (tANI_U8);
-#ifdef WLAN_FEATURE_AP_HT40_24G
-        // 40 MHz Intolerant
-        *pBuf = pAssocInd->HT40MHzIntoEnabledSta;
-        pBuf += sizeof (tANI_U8);
-#endif
         msgQ.type = eWNI_SME_UPPER_LAYER_ASSOC_CNF;
         msgQ.bodyptr = pMsg;
         msgQ.bodyval = 0;
@@ -14366,9 +14218,6 @@ eHalStatus csrSendMBStartBssReqMsg( tpAniSirGlobal pMac, tANI_U32 sessionId, eCs
                          pParam->extendedRateSet.numRates);
             pBuf += pParam->extendedRateSet.numRates;
         }
-#ifdef WLAN_FEATURE_AP_HT40_24G
-        *pBuf++ = (tANI_U8)pMac->roam.configParam.apHT40_24GEnabled;
-#endif
 
         msgLen = (tANI_U16)(sizeof(tANI_U32 ) + (pBuf - wTmpBuf)); //msg_header + msg
         pMsg->length = pal_cpu_to_be16(msgLen);
@@ -17255,13 +17104,6 @@ void csrReleaseCommand(tpAniSirGlobal pMac, tSmeCmd *pCommand)
 eHalStatus csrQueueSmeCommand( tpAniSirGlobal pMac, tSmeCmd *pCommand, tANI_BOOLEAN fHighPriority )
 {
     eHalStatus status;
-
-    if (!SME_IS_START(pMac))
-    {
-        smsLog( pMac, LOGE, FL("Sme in stop state"));
-        return eHAL_STATUS_FAILURE;
-    }
-
     if( (eSmeCommandScan == pCommand->command) && pMac->scan.fDropScanCmd )
     {
         smsLog(pMac, LOGW, FL(" drop scan (scan reason %d) command"),
@@ -17914,30 +17756,3 @@ void csrDisableDfsChannel(tpAniSirGlobal pMac)
      csrApplyChannelPowerCountryInfo( pMac, &pMac->scan.base20MHzChannels,
                   pMac->scan.countryCodeCurrent, eANI_BOOLEAN_TRUE);
 }
-
-/* ---------------------------------------------------------------------------
-    \fn csrGetStaticUapsdMask
-    \brief  This function will get the static uapsd settings for an existing
-    \ Infra session.
-    \param  pMac - pMac global structure
-    \- return void
-    -------------------------------------------------------------------------*/
-void csrGetStaticUapsdMask(tpAniSirGlobal pMac, tANI_U8 *staticUapsdMask)
-{
-    tANI_S8 sessionId;
-    tCsrRoamSession *pSession = NULL;
-
-    *staticUapsdMask = 0;
-    sessionId = csrGetInfraSessionId(pMac);
-    if(sessionId == -1)
-       smsLog(pMac, LOGE, FL("Valid session not present."));
-    else
-       pSession = CSR_GET_SESSION(pMac, sessionId);
-
-    if(!pSession || !pSession->pCurRoamProfile)
-       smsLog(pMac, LOGE, FL("Either pSession or Roam profile is NULL,"
-           " pSession:%p"), pSession);
-    else
-       *staticUapsdMask = pSession->pCurRoamProfile->uapsd_mask;
-}
-

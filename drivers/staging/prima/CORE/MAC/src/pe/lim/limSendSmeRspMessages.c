@@ -310,9 +310,9 @@ limSendSmeJoinReassocRsp(tpAniSirGlobal pMac, tANI_U16 msgType,
         limDiagEventReport(pMac, WLAN_PE_DIAG_JOIN_RSP_EVENT, psessionEntry, (tANI_U16)resultCode, 0);
 #endif //FEATURE_WLAN_DIAG_SUPPORT
 
-    limLog(pMac, LOG1,
+    PELOG1(limLog(pMac, LOG1,
            FL("Sending message %s with reasonCode %s"),
-           limMsgStr(msgType), limResultCodeStr(resultCode));
+           limMsgStr(msgType), limResultCodeStr(resultCode));)
 
     if(psessionEntry == NULL)
     {
@@ -563,8 +563,8 @@ limSendSmeStartBssRsp(tpAniSirGlobal pMac,
     tANI_U16            ieLen;
     tANI_U16            ieOffset, curLen;
 
-    limLog(pMac, LOG1, FL("Sending message %s with reasonCode %s"),
-           limMsgStr(msgType), limResultCodeStr(resultCode));
+    PELOG1(limLog(pMac, LOG1, FL("Sending message %s with reasonCode %s"),
+           limMsgStr(msgType), limResultCodeStr(resultCode));)
 
     size = sizeof(tSirSmeStartBssRsp);
 
@@ -714,9 +714,9 @@ limSendSmeScanRsp(tpAniSirGlobal pMac, tANI_U16 length,
     tANI_U8               *pbBuf;
     tSirBssDescription    *pDesc;
 
-    limLog(pMac, LOG1,
+    PELOG1(limLog(pMac, LOG1,
        FL("Sending message SME_SCAN_RSP with length=%d reasonCode %s"),
-       length, limResultCodeStr(resultCode));
+       length, limResultCodeStr(resultCode));)
 
     if (resultCode != eSIR_SME_SUCCESS)
     {
@@ -787,16 +787,16 @@ limSendSmeScanRsp(tpAniSirGlobal pMac, tANI_U16 length,
             }
             curMsgLen = msgLen;
 
-            limLog(pMac, LOG1, FL("ScanRsp : msgLen %d, bssDescr Len=%d"),
-                          msgLen, ptemp->bssDescription.length);
+            PELOG2(limLog(pMac, LOG2, FL("ScanRsp : msgLen %d, bssDescr Len=%d"),
+                          msgLen, ptemp->bssDescription.length);)
             pDesc->length
                     = ptemp->bssDescription.length;
             vos_mem_copy( (tANI_U8 *) &pDesc->bssId,
                           (tANI_U8 *) &ptemp->bssDescription.bssId,
                            ptemp->bssDescription.length);
 
-            limLog(pMac, LOG1, FL("BssId "));
-            limPrintMacAddr(pMac, ptemp->bssDescription.bssId, LOG1);
+            PELOG2(limLog(pMac, LOG2, FL("BssId "));
+            limPrintMacAddr(pMac, ptemp->bssDescription.bssId, LOG2);)
 
             pSirSmeScanRsp->sessionId   = smesessionId;
             pSirSmeScanRsp->transcationId = smetranscationId;
@@ -830,7 +830,7 @@ limSendSmeScanRsp(tpAniSirGlobal pMac, tANI_U16 length,
         mmhMsg.bodyval = 0;
         MTRACE(macTraceMsgTx(pMac, NO_SESSION, mmhMsg.type));
         limSysProcessMmhMsgApi(pMac, &mmhMsg, ePROT);
-        limLog(pMac, LOG1, FL("statusCode : eSIR_SME_SUCCESS"));
+        PELOG2(limLog(pMac, LOG2, FL("statusCode : eSIR_SME_SUCCESS"));)
     }
 
     return;
@@ -1025,9 +1025,9 @@ limPostSmeScanRspMessage(tpAniSirGlobal    pMac,
     tpSirSmeScanRsp   pSirSmeScanRsp;
     tSirMsgQ          mmhMsg;
 
-    limLog(pMac, LOG1,
+    PELOG1(limLog(pMac, LOG1,
        FL("limPostSmeScanRspMessage: send SME_SCAN_RSP (len %d, reasonCode %s). "),
-       length, limResultCodeStr(resultCode));
+       length, limResultCodeStr(resultCode));)
 
     pSirSmeScanRsp = vos_mem_malloc(length);
     if ( NULL == pSirSmeScanRsp )
@@ -2681,7 +2681,7 @@ void limSendExitBmpsInd(tpAniSirGlobal pMac, tExitBmpsReason reasonCode)
     mmhMsg.bodyptr = pExitBmpsInd;
     mmhMsg.bodyval = 0;
   
-    limLog(pMac, LOG1, FL("Sending eWNI_PMC_EXIT_BMPS_IND to SME. "));
+    PELOG1(limLog(pMac, LOG1, FL("Sending eWNI_PMC_EXIT_BMPS_IND to SME. "));)
     MTRACE(macTraceMsgTx(pMac, NO_SESSION, mmhMsg.type));
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_LIM //FEATURE_WLAN_DIAG_SUPPORT 
     limDiagEventReport(pMac, WLAN_PE_DIAG_EXIT_BMPS_IND_EVENT, peGetValidPowerSaveSession(pMac), 0, (tANI_U16)reasonCode);
@@ -2823,8 +2823,8 @@ void limSendSmeMaxAssocExceededNtf(tpAniSirGlobal pMac, tSirMacAddr peerMacAddr,
     pSmeMaxAssocInd->sessionId = smesessionId;
     mmhMsg.type = pSmeMaxAssocInd->mesgType;
     mmhMsg.bodyptr = pSmeMaxAssocInd;
-    limLog(pMac, LOG1, FL("msgType %s peerMacAddr "MAC_ADDRESS_STR
-                  " sme session id %d"), "eWNI_SME_MAX_ASSOC_EXCEEDED", MAC_ADDR_ARRAY(peerMacAddr),smesessionId);
+    PELOG1(limLog(pMac, LOG1, FL("msgType %s peerMacAddr "MAC_ADDRESS_STR
+                  " sme session id %d"), "eWNI_SME_MAX_ASSOC_EXCEEDED", MAC_ADDR_ARRAY(peerMacAddr));)
     MTRACE(macTraceMsgTx(pMac, smesessionId, mmhMsg.type));
     limSysProcessMmhMsgApi(pMac, &mmhMsg, ePROT);
 

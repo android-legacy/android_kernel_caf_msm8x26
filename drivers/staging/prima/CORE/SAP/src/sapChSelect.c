@@ -2125,11 +2125,9 @@ eChannelWidthInfo sapGetChannelWidthInfo(tHalHandle halHandle, ptSapContext pSap
     v_U32_t cbMode;
     eChannelWidthInfo chWidth = CHWIDTH_HT20;
 
-#ifdef WLAN_FEATURE_AP_HT40_24G
     if (eSAP_RF_SUBBAND_2_4_GHZ == operatingBand)
         cbMode = sme_GetChannelBondingMode24G(halHandle);
     else
-#endif
         cbMode = sme_GetChannelBondingMode5G(halHandle);
 
     if (phyMode == eSAP_DOT11_MODE_11n ||
@@ -2187,6 +2185,13 @@ v_U8_t sapSelectChannel(tHalHandle halHandle, ptSapContext pSapCtx,  tScanResult
     eChannelWidthInfo chWidth;
 #endif
     VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH, "In %s, Running SAP Ch Select", __func__);
+
+    if (NULL == pScanResult)
+    {
+        //scan is successfull, but no AP is present, select the first channel is channel range
+        ccmCfgGetInt( halHandle, WNI_CFG_SAP_CHANNEL_SELECT_START_CHANNEL, &startChannelNum);
+        return startChannelNum;
+    }
 
     // Initialize the structure pointed by pSpectInfoParams
     if(sapChanSelInit( halHandle, pSpectInfoParams) != eSAP_TRUE ) {

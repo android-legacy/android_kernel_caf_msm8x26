@@ -257,9 +257,6 @@ typedef struct sLimMlmAssocInd
 
 
     tAniBool               WmmStaInfoPresent;
-#ifdef WLAN_FEATURE_AP_HT40_24G
-    tAniBool               HT40MHzIntoPresent;
-#endif
 
     // Required for indicating the frames to upper layer
     tANI_U32             beaconLength;
@@ -299,9 +296,6 @@ typedef struct sLimMlmReassocInd
     tSirSupChnl             supportedChannels;
 
     tAniBool               WmmStaInfoPresent;
-#ifdef WLAN_FEATURE_AP_HT40_24G
-    tAniBool               HT40MHzIntoPresent;
-#endif
 
     // Required for indicating the frames to upper layer
     tANI_U32             beaconLength;
@@ -1112,6 +1106,5 @@ void limProcessRxScanEvent(tpAniSirGlobal mac, void *buf);
 
 int limProcessRemainOnChnlReq(tpAniSirGlobal pMac, tANI_U32 *pMsg);
 void limRemainOnChnRsp(tpAniSirGlobal pMac, eHalStatus status, tANI_U32 *data);
-void limProcessMlmSpoofMacAddrRsp(tpAniSirGlobal pMac, tSirRetStatus rspStatus);
 #endif /* __LIM_TYPES_H */
 

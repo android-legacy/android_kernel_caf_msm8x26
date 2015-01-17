@@ -664,7 +664,7 @@ tSirRetStatus limStart(tpAniSirGlobal pMac)
 {
    tSirResultCodes retCode = eSIR_SUCCESS;
 
-   limLog(pMac, LOG1, FL(" enter"));
+   PELOG1(limLog(pMac, LOG1, FL(" enter"));)
 
    if (pMac->lim.gLimSmeState == eLIM_SME_OFFLINE_STATE)
    {
@@ -991,7 +991,6 @@ tSirRetStatus peOpen(tpAniSirGlobal pMac, tMacOpenParameters *pMacOpenParam)
         return eSIR_SUCCESS;
     pMac->lim.maxBssId = pMacOpenParam->maxBssId;
     pMac->lim.maxStation = pMacOpenParam->maxStation;
-    vos_spin_lock_init( &pMac->sys.lock );
 
     if ((pMac->lim.maxBssId == 0) || (pMac->lim.maxStation == 0))
     {
@@ -1088,9 +1087,7 @@ tSirRetStatus peClose(tpAniSirGlobal pMac)
 
     if (ANI_DRIVER_TYPE(pMac) == eDRIVER_TYPE_MFG)
         return eSIR_SUCCESS;
-
-    vos_spin_lock_destroy( &pMac->sys.lock );
-
+    
     for(i =0; i < pMac->lim.maxBssId; i++)
     {
         if(pMac->lim.gpSession[i].valid == TRUE)
@@ -1342,7 +1339,7 @@ tSirRetStatus peProcessMessages(tpAniSirGlobal pMac, tSirMsgQ* pMsg)
     return eSIR_SUCCESS;
 }
 
-#define RSRVD_MGMT_RX_PACKETS 10
+
 
 // ---------------------------------------------------------------------------
 /**
@@ -1415,30 +1412,6 @@ VOS_STATUS peHandleMgmtFrame( v_PVOID_t pvosGCtx, v_PVOID_t vosBuff)
     msg.type = SIR_BB_XPORT_MGMT_MSG;
     msg.bodyptr = vosBuff;
     msg.bodyval = 0;
-
-    vos_spin_lock_acquire( &pMac->sys.lock );
-    if( pMac->sys.gSysBbtPendingMgmtCount > (vos_pkt_get_num_of_rx_raw_pkts()/4) )
-    {
-        vos_spin_lock_release( &pMac->sys.lock );
-        // drop all management packets
-        vos_pkt_return_packet(pVosPkt);
-        return  VOS_STATUS_SUCCESS;
-    }
-
-    if( pMac->sys.gSysBbtPendingMgmtCount > ( vos_pkt_get_num_of_rx_raw_pkts()/4
-                                              - RSRVD_MGMT_RX_PACKETS ))
-    {
-        // drop all probereq, proberesp and beacons
-        if( mHdr->fc.subType == SIR_MAC_MGMT_BEACON ||  mHdr->fc.subType ==
-            SIR_MAC_MGMT_PROBE_REQ ||  mHdr->fc.subType == SIR_MAC_MGMT_PROBE_RSP )
-        {
-            vos_spin_lock_release( &pMac->sys.lock );
-            vos_pkt_return_packet(pVosPkt);
-            return  VOS_STATUS_SUCCESS;
-        }
-    }
-    pMac->sys.gSysBbtPendingMgmtCount++;
-    vos_spin_lock_release( &pMac->sys.lock );
 
     if( eSIR_SUCCESS != sysBbtProcessMessageCore( pMac,
                                                   &msg,
@@ -1751,7 +1724,7 @@ limHandleIBSScoalescing(
         ieLen    = WDA_GET_RX_PAYLOAD_LEN(pRxPacketInfo);
         tsfLater = WDA_GET_RX_TSF_LATER(pRxPacketInfo);
         pIEs = WDA_GET_RX_MPDU_DATA(pRxPacketInfo);
-        limLog(pMac, LOG1, FL("BEFORE Coalescing tsfLater val :%d"), tsfLater);
+        PELOG3(limLog(pMac, LOG3, FL("BEFORE Coalescing tsfLater val :%d"), tsfLater);)
         retCode  = limIbssCoalesce(pMac, pHdr, pBeacon, pIEs, ieLen, tsfLater,psessionEntry);
     }
     return retCode;
@@ -1791,12 +1764,8 @@ tAniBool limEncTypeMatched(tpAniSirGlobal pMac, tpSchBeaconStruct  pBeacon,
     /* WEP */
     if ( (pBeacon->capabilityInfo.privacy == 1) && (pBeacon->wpaPresent == 0) &&
             (pBeacon->rsnPresent == 0) &&
-            ( ( pSession->encryptType == eSIR_ED_WEP40 ) ||
-              ( pSession->encryptType == eSIR_ED_WEP104 )
-#ifdef FEATURE_WLAN_WAPI
-              || ( pSession->encryptType == eSIR_ED_WPI )
-#endif
-             ))
+            ( (pSession->encryptType == eSIR_ED_WEP40) ||
+                     (pSession->encryptType == eSIR_ED_WEP104)))
         return eSIR_TRUE;
 
     /* WPA OR RSN*/
@@ -1866,7 +1835,10 @@ limDetectChangeInApCapabilities(tpAniSirGlobal pMac,
           (eSIR_FALSE == securityCapsMatched)
           ) ) )
     {
-        if ( false == psessionEntry->fWaitForProbeRsp )
+        /* No need to send probe request if security
+         * capability doesnt match, Disconnect directly.*/
+        if( (false == psessionEntry->fWaitForProbeRsp) &&
+                              (eSIR_TRUE == securityCapsMatched))
         {
             /* If Beacon capabilities is not matching with the current capability,
              * then send unicast probe request to AP and take decision after
@@ -2026,7 +1998,7 @@ tSirRetStatus limUpdateShortSlot(tpAniSirGlobal pMac, tpSirProbeRespBeacon pBeac
     if (nShortSlot != psessionEntry->shortSlotTimeSupported)
     {
         // Short slot time capability of AP has changed. Adopt to it.
-        limLog(pMac, LOG1, FL("Shortslot capability of AP changed: %d"),  nShortSlot);
+        PELOG1(limLog(pMac, LOG1, FL("Shortslot capability of AP changed: %d"),  nShortSlot);)
         ((tpSirMacCapabilityInfo)&psessionEntry->limCurrentBssCaps)->shortSlotTime = (tANI_U16)nShortSlot;
         psessionEntry->shortSlotTimeSupported = nShortSlot;
         pBeaconParams->fShortSlotTime = (tANI_U8) nShortSlot;
@@ -2100,7 +2072,7 @@ void limHandleBmpsStatusInd(tpAniSirGlobal pMac)
         case ePMM_STATE_UAPSD_SLEEP:
         case ePMM_STATE_UAPSD_WT_WAKEUP_RSP:
         case ePMM_STATE_WOWLAN:
-            limLog(pMac, LOG1, FL("Sending EXIT_BMPS_IND to SME "));
+            PELOG1(limLog(pMac, LOG1, FL("Sending EXIT_BMPS_IND to SME "));)
             limSendExitBmpsInd(pMac, eSME_BMPS_STATUS_IND_RCVD);
             break;
 

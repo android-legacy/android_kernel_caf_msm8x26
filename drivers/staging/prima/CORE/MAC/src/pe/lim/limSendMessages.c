@@ -271,17 +271,13 @@ tSirRetStatus limSendSwitchChnlParams(tpAniSirGlobal pMac,
     msgQ.bodyptr = pChnlParams;
     msgQ.bodyval = 0;
 #if defined WLAN_FEATURE_VOWIFI  
-    limLog( pMac, LOG1,
-        FL( "Sending WDA_CHNL_SWITCH_REQ with SecondaryChnOffset - %d,"
-        " ChannelNumber - %d, maxTxPower - %d"),
-        pChnlParams->secondaryChannelOffset, pChnlParams->channelNumber,
-                                                pChnlParams->maxTxPower);
+    PELOG3(limLog( pMac, LOG3,
+        FL( "Sending WDA_CHNL_SWITCH_REQ with SecondaryChnOffset - %d, ChannelNumber - %d, maxTxPower - %d"),
+        pChnlParams->secondaryChannelOffset, pChnlParams->channelNumber, pChnlParams->maxTxPower);)
 #else
-    limLog( pMac, LOG1,
-        FL( "Sending WDA_CHNL_SWITCH_REQ with SecondaryChnOffset - %d, "
-        "ChannelNumber - %d, LocalPowerConstraint - %d"),
-        pChnlParams->secondaryChannelOffset, pChnlParams->channelNumber,
-                                        pChnlParams->localPowerConstraint);
+    PELOG3(limLog( pMac, LOG3,
+        FL( "Sending WDA_CHNL_SWITCH_REQ with SecondaryChnOffset - %d, ChannelNumber - %d, LocalPowerConstraint - %d"),
+        pChnlParams->secondaryChannelOffset, pChnlParams->channelNumber, pChnlParams->localPowerConstraint);)
 #endif
     MTRACE(macTraceMsgTx(pMac, peSessionId, msgQ.type));
     limLog(pMac,LOG1,"SessionId:%d WDA_CHNL_SWITCH_REQ for SSID:%s",peSessionId,
@@ -1054,8 +1050,8 @@ tSirRetStatus limSendExcludeUnencryptInd(tpAniSirGlobal pMac,
     msgQ.reserved = 0;
     msgQ.bodyptr = pExcludeUnencryptParam;
     msgQ.bodyval = 0;
-    limLog(pMac, LOG1,
-                FL("Sending WDA_EXCLUDE_UNENCRYPTED_IND"));
+    PELOG3(limLog(pMac, LOG3,
+                FL("Sending WDA_EXCLUDE_UNENCRYPTED_IND"));)
     MTRACE(macTraceMsgTx(pMac, psessionEntry->peSessionId, msgQ.type));
     retCode = wdaPostCtrlMsg(pMac, &msgQ);
     if (eSIR_SUCCESS != retCode)

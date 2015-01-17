@@ -211,7 +211,7 @@ limDeletePreAuthList(tpAniSirGlobal pMac)
     {
         pTempNode = pCurrNode->next;
 
-        limLog(pMac, LOG1, FL("=====> limDeletePreAuthList "));
+        PELOG1(limLog(pMac, LOG1, FL("=====> limDeletePreAuthList "));)
         limReleasePreAuthNode(pMac, pCurrNode);
 
         pCurrNode = pTempNode;
@@ -365,11 +365,10 @@ limDeletePreAuthNode(tpAniSirGlobal pMac, tSirMacAddr macAddr)
         pMac->lim.pLimPreAuthList = pTempNode->next;
 
 
-        limLog(pMac, LOG1, FL(" first node to delete"));
-        limLog(pMac, LOG1,
-               FL(" Release data entry:%p idx %d peer: " MAC_ADDRESS_STR),
-                                         pTempNode, pTempNode->authNodeIdx,
-                                                   MAC_ADDR_ARRAY(macAddr));
+        PELOG1(limLog(pMac, LOG1, FL("=====> limDeletePreAuthNode : first node to delete"));)
+        PELOG1(limLog(pMac, LOG1, FL("Release data entry: %x id %d peer "),
+                        pTempNode, pTempNode->authNodeIdx);
+        limPrintMacAddr(pMac, macAddr, LOG1);)
         limReleasePreAuthNode(pMac, pTempNode);
 
         return;
@@ -387,10 +386,10 @@ limDeletePreAuthNode(tpAniSirGlobal pMac, tSirMacAddr macAddr)
 
             pPrevNode->next = pTempNode->next;
 
-            limLog(pMac, LOG1, FL(" subsequent node to delete"));
-            limLog(pMac, LOG1,
-                   FL("Release data entry: %p id %d peer: "MAC_ADDRESS_STR),
-                   pTempNode, pTempNode->authNodeIdx, MAC_ADDR_ARRAY(macAddr));
+            PELOG1(limLog(pMac, LOG1, FL("=====> limDeletePreAuthNode : subsequent node to delete"));
+            limLog(pMac, LOG1, FL("Release data entry: %x id %d peer "),
+                         pTempNode, pTempNode->authNodeIdx);
+            limPrintMacAddr(pMac, macAddr, LOG1);)
             limReleasePreAuthNode(pMac, pTempNode);
 
             return;

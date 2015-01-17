@@ -2717,10 +2717,6 @@ eHalStatus csrScanningStateMsgProcessor( tpAniSirGlobal pMac, void *pMsgBuf )
             vos_mem_copy(pRoamInfo->peerMac, pUpperLayerAssocCnf->peerMacAddr, sizeof(tSirMacAddr));
             vos_mem_copy(&pRoamInfo->bssid, pUpperLayerAssocCnf->bssId, sizeof(tCsrBssid));
             pRoamInfo->wmmEnabledSta = pUpperLayerAssocCnf->wmmEnabledSta;
-#ifdef WLAN_FEATURE_AP_HT40_24G
-            pRoamInfo->HT40MHzIntoEnabledSta =
-                       pUpperLayerAssocCnf->HT40MHzIntoEnabledSta;
-#endif
             if(CSR_IS_INFRA_AP(pRoamInfo->u.pConnectedProfile) )
             {
                 pMac->roam.roamSession[sessionId].connectState = eCSR_ASSOC_STATE_TYPE_INFRA_CONNECTED;
@@ -7886,11 +7882,10 @@ eHalStatus csrProcessSetBGScanParam(tpAniSirGlobal pMac, tSmeCmd *pCommand)
 }
 
 
-tSirAbortScanStatus csrScanAbortMacScan(tpAniSirGlobal pMac,
-                                        tANI_U8 sessionId,
-                                        eCsrAbortReason reason)
+eHalStatus csrScanAbortMacScan(tpAniSirGlobal pMac, tANI_U8 sessionId,
+                               eCsrAbortReason reason)
 {
-    tSirAbortScanStatus abortScanStatus = eSIR_ABORT_ACTIVE_SCAN_LIST_EMPTY;
+    eHalStatus status = eHAL_STATUS_FAILURE;
     tSirSmeScanAbortReq *pMsg;
     tANI_U16 msgLen;
     tListElem *pEntry;
@@ -7941,8 +7936,8 @@ tSirAbortScanStatus csrScanAbortMacScan(tpAniSirGlobal pMac,
             pMsg = vos_mem_malloc(msgLen);
             if ( NULL == pMsg )
             {
+               status = eHAL_STATUS_FAILURE;
                smsLog(pMac, LOGE, FL("Failed to allocate memory for SmeScanAbortReq"));
-               abortScanStatus = eSIR_ABORT_SCAN_FAILURE;
             }
             else
             {
@@ -7955,21 +7950,12 @@ tSirAbortScanStatus csrScanAbortMacScan(tpAniSirGlobal pMac,
                 pMsg->type = pal_cpu_to_be16((tANI_U16)eWNI_SME_SCAN_ABORT_IND);
                 pMsg->msgLen = pal_cpu_to_be16(msgLen);
                 pMsg->sessionId = sessionId;
-                if (eHAL_STATUS_SUCCESS != palSendMBMessage(pMac->hHdd, pMsg))
-                {
-                    smsLog(pMac, LOGE,
-                           FL("Failed to post eWNI_SME_SCAN_ABORT_IND"));
-                    abortScanStatus = eSIR_ABORT_SCAN_FAILURE;
-                }
-                else
-                {
-                    abortScanStatus = eSIR_ABORT_ACTIVE_SCAN_LIST_NOT_EMPTY;
-                }
+                status = palSendMBMessage(pMac->hHdd, pMsg);
             }
         }
     }
 
-    return(abortScanStatus);
+    return(status);
 }
 
 void csrRemoveCmdWithSessionIdFromPendingList(tpAniSirGlobal pMac,
@@ -8188,12 +8174,7 @@ eHalStatus csrScanAbortMacScanNotForConnect(tpAniSirGlobal pMac,
     if( !csrIsScanForRoamCommandActive( pMac ) )
     {
         //Only abort the scan if it is not used for other roam/connect purpose
-        if (eSIR_ABORT_SCAN_FAILURE ==
-                csrScanAbortMacScan(pMac, sessionId, eCSR_SCAN_ABORT_DEFAULT))
-        {
-            smsLog(pMac, LOGE, FL("fail to abort scan"));
-            status = eHAL_STATUS_FAILURE;
-        }
+        status = csrScanAbortMacScan(pMac, sessionId, eCSR_SCAN_ABORT_DEFAULT);
     }
 
     return (status);

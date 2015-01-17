@@ -220,16 +220,6 @@
 #define CFG_IMPS_MAXIMUM_SLEEP_TIME_MAX        ( 65535 )
 #define CFG_IMPS_MAXIMUM_SLEEP_TIME_DEFAULT    ( 15 )
 
-/*If there is scan on STA interface back to back with
- *time diff nDeferScanTimeInterval, driver will not
- *issue a new scan. Driver will return cached result to kernel.
- *the interval is in msec
- */
-#define CFG_DEFER_SCAN_TIME_INTERVAL            "gDeferScanTimeInterval"
-#define CFG_DEFER_SCAN_TIME_INTERVAL_MIN        ( 0 )
-#define CFG_DEFER_SCAN_TIME_INTERVAL_MAX        ( 65535 )
-#define CFG_DEFER_SCAN_TIME_INTERVAL_DEFAULT    ( 2000  )
-
 //BMPS = BeaconModePowerSave
 #define CFG_ENABLE_BMPS_NAME                   "gEnableBmps"
 #define CFG_ENABLE_BMPS_MIN                    ( 0 )
@@ -1741,7 +1731,7 @@ static __inline tANI_U32 defHddRateToDefCfgRate( tANI_U32 defRateIndex )
 #define CFG_THERMAL_MIGRATION_ENABLE_NAME      "gThermalMitigationEnable"   
 #define CFG_THERMAL_MIGRATION_ENABLE_MIN       ( 0 ) 
 #define CFG_THERMAL_MIGRATION_ENABLE_MAX       ( 1 ) 
-#define CFG_THERMAL_MIGRATION_ENABLE_DEFAULT   ( 1 )
+#define CFG_THERMAL_MIGRATION_ENABLE_DEFAULT   ( 0 ) 
 
 /*
  * Enable/Disable Modulated DTIM feature
@@ -1880,24 +1870,12 @@ static __inline tANI_U32 defHddRateToDefCfgRate( tANI_U32 defRateIndex )
 #define CFG_TDLS_WMM_MODE_ENABLE                     "gEnableTDLSWmmMode"
 #define CFG_TDLS_WMM_MODE_ENABLE_MIN                 (0)
 #define CFG_TDLS_WMM_MODE_ENABLE_MAX                 (1)
-#define CFG_TDLS_WMM_MODE_ENABLE_DEFAULT             (1)
+#define CFG_TDLS_WMM_MODE_ENABLE_DEFAULT             (0)
 
 #define CFG_TDLS_SCAN_COEX_SUPPORT_ENABLE            "gEnableTDLSScanCoexistence"
 #define CFG_TDLS_SCAN_COEX_SUPPORT_ENABLE_MIN        (0)
 #define CFG_TDLS_SCAN_COEX_SUPPORT_ENABLE_MAX        (1)
 #define CFG_TDLS_SCAN_COEX_SUPPORT_ENABLE_DEFAULT    (0)
-
-
-/* if gEnableTDLSScan
- * 0: Same as gEnableTDLSScanCoexistence ; driver will do disconnect if
- * Peer is not buffer STA capable.
- * 1: Dut will scan in all cases.
- * 2: If peer is not buffer STA capable, use CTS2self to do scan.
-*/
-#define CFG_TDLS_SCAN_ENABLE            "gEnableTDLSScan"
-#define CFG_TDLS_SCAN_ENABLE_MIN        (0)
-#define CFG_TDLS_SCAN_ENABLE_MAX        (2)
-#define CFG_TDLS_SCAN_ENABLE_DEFAULT    (0)
 #endif
 
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS
@@ -1974,7 +1952,7 @@ static __inline tANI_U32 defHddRateToDefCfgRate( tANI_U32 defRateIndex )
 #define CFG_VHT_AMPDU_LEN_EXP_NAME          "gVhtMaxAmpduLenExp"
 #define CFG_VHT_AMPDU_LEN_EXP_MIN           ( 0 )
 #define CFG_VHT_AMPDU_LEN_EXP_MAX           ( 7 )
-#define CFG_VHT_AMPDU_LEN_EXP_DEFAULT       ( 7 )
+#define CFG_VHT_AMPDU_LEN_EXP_DEFAULT       ( 3 )
 
 #endif
 
@@ -2179,10 +2157,6 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_CTS2S_DURING_BTC_SCO_MIN            WNI_CFG_BTC_CTS2S_DURING_SCO_STAMIN
 #define CFG_CTS2S_DURING_BTC_SCO_MAX            WNI_CFG_BTC_CTS2S_DURING_SCO_STAMAX
 
-#define CFG_BTC_FAST_WLAN_CONN_PREF             "gBtcFastWlanConnPref"
-#define CFG_BTC_FAST_WLAN_CONN_PREF_DEFAULT     ( 1 )
-#define CFG_BTC_FAST_WLAN_CONN_PREF_MIN         ( 0 )
-#define CFG_BTC_FAST_WLAN_CONN_PREF_MAX         ( 1 )
 
 /*
  * Connection related log Enable/Disable.
@@ -2312,13 +2286,6 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_MAX_CONCURRENT_CONNECTIONS_MIN        ( 1 )
 #define CFG_MAX_CONCURRENT_CONNECTIONS_MAX        ( 4 )
 
-#ifdef WLAN_FEATURE_AP_HT40_24G
-#define CFG_ENABLE_HT_2040_COEX                    "gApHT4024G"
-#define CFG_ENABLE_HT_2040_COEX_MIN                ( 0 )
-#define CFG_ENABLE_HT_2040_COEX_MAX                ( 1 )
-#define CFG_ENABLE_HT_2040_COEX_DEFAULT            ( 0 )
-#endif
-
 //Enable Dynamic WMM PS support
 #define CFG_ENABLE_DYNAMIC_WMMPS_NAME        "gEnableDynamicWMMPS"
 #define CFG_ENABLE_DYNAMIC_WMM_PS_MIN        (0)
@@ -2393,20 +2360,19 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_MAX_UAPSD_INACT_INTVL_MAX        (255)
 #define CFG_MAX_UAPSD_INACT_INTVL_DEFAULT    (10)
 
+/*
+ * This will enable DHCP packet logging for debugging purpose
+ * The log level is set as INFO.
+ */
+#define CFG_DEBUG_DHCP                          "gEnableDhcpDebug"
+#define CFG_DEBUG_DHCP_DISABLE                  ( 0 )
+#define CFG_DEBUG_DHCP_ENABLE                   ( 1 )
+#define CFG_DEBUG_DHCP_DEFAULT                  ( CFG_DEBUG_DHCP_DISABLE )
+
 #define CFG_BURST_MODE_BE_TXOP_VALUE           "gBurstModeTXOPValue"
 #define CFG_BURST_MODE_BE_TXOP_VALUE_MIN       ( 0 )
 #define CFG_BURST_MODE_BE_TXOP_VALUE_MAX       ( 12288 )
 #define CFG_BURST_MODE_BE_TXOP_VALUE_DEFAULT   ( 0 )
-
-#define CFG_P2P_LISTEN_DEFER_INTERVAL_NAME     "gP2PListenDeferInterval"
-#define CFG_P2P_LISTEN_DEFER_INTERVAL_MIN      ( 100 )
-#define CFG_P2P_LISTEN_DEFER_INTERVAL_MAX      ( 200 )
-#define CFG_P2P_LISTEN_DEFER_INTERVAL_DEFAULT  ( 100 )
-
-#define CFG_BTC_ENABLE_IND_TIMER_VALUE          "gBtcEnableIndTimerVal"
-#define CFG_BTC_ENABLE_IND_TIMER_VALUE_MIN     ( 5 )
-#define CFG_BTC_ENABLE_IND_TIMER_VALUE_MAX     ( 60 )
-#define CFG_BTC_ENABLE_IND_TIMER_VALUE_DEFAULT ( 60 )
 
 /*--------------------------------------------------------------------------- 
   Type declarations
@@ -2427,7 +2393,6 @@ typedef struct
    v_BOOL_t      ShortSlotTimeEnabled;
    v_BOOL_t      Is11dSupportEnabled;
    v_BOOL_t      Is11hSupportEnabled;
-   v_U32_t       nDeferScanTimeInterval;
    v_BOOL_t      fEnforce11dChannels;
    v_BOOL_t      fSupplicantCountryCodeHasPriority;
    v_BOOL_t      fEnforceCountryCodeMatch;
@@ -2779,7 +2744,6 @@ typedef struct
    v_U32_t                     fEnableTDLSOffChannel;
    v_U32_t                     fEnableTDLSWmmMode;
    v_BOOL_t                    fEnableTDLSScanCoexSupport;
-   v_BOOL_t                    fEnableTDLSScan;
 #endif
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS
    v_BOOL_t                    fEnableLLStats;
@@ -2845,7 +2809,7 @@ typedef struct
 #endif
    char                        overrideCountryCode[4];
    v_U32_t                     gAsdProbeInterval;
-   v_S7_t                      gAsdTriggerThreshold;
+   v_U32_t                     gAsdTriggerThreshold;
    v_U32_t                     gAsdRTTRssiHystThreshold;
    v_BOOL_t                    debugP2pRemainOnChannel;
    v_U32_t                     cfgBtcCTS2SduringSCO;
@@ -2892,16 +2856,11 @@ typedef struct
    v_U32_t                     uapsdConsecTxCntMeasWindow;
    v_U32_t                     maxPsPollInWmmUapsdMode;
    v_U32_t                     maxUapsdInactivityIntervals;
+   v_U8_t                      enableDhcpDebug; /* Enable/Disable dhcp debug */
    v_U32_t                     burstModeTXOPValue;
    v_U8_t                      acsScanBandPreference;
    v_U16_t                     acsBandSwitchThreshold;
    v_U32_t                     enableDynamicRAStartRate;
-#ifdef WLAN_FEATURE_AP_HT40_24G
-   v_BOOL_t                    apHT40_24GEnabled;
-#endif
-   v_U16_t                     gP2PListenDeferInterval;
-   v_U8_t                      btcEnableIndTimerVal;
-   v_BOOL_t                    btcFastWlanConnPref;
 } hdd_config_t;
 /*--------------------------------------------------------------------------- 
   Function declarations and documenation
