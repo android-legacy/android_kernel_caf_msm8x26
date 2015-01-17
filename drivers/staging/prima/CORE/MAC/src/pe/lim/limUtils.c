@@ -88,6 +88,20 @@ limProcessChannelSwitchSuspendLink(tpAniSirGlobal pMac,
                                     eHalStatus status,
                                     tANI_U32 *ctx);
 /** -------------------------------------------------------------
+\fn limCheck11BRateBitmap
+\brief Verifies if basic rates are set.
+\param     tANI_U16 pRateBitmap
+\return tANI_BOOLEAN - true or false
+  -------------------------------------------------------------*/
+
+tANI_BOOLEAN limCheck11BRateBitmap(tANI_U16 pRateBitmap)
+{
+        return ( ( pRateBitmap & ( 1 << 0 ) ) || ( pRateBitmap & ( 1 << 1 ) ) ||
+                        ( pRateBitmap & ( 1 << 2 ) ) ||
+                               ( pRateBitmap & ( 1 << 3 ) ) ? 1 : 0 ) ;
+}
+
+/** -------------------------------------------------------------
 \fn limAssignDialogueToken
 \brief Assigns dialogue token.
 \param     tpAniSirGlobal    pMac
@@ -1915,7 +1929,7 @@ limDecideApProtection(tpAniSirGlobal pMac, tSirMacAddr peerMacAddr, tpUpdateBeac
     pStaDs = dphLookupHashEntry(pMac, peerMacAddr, &tmpAid, &psessionEntry->dph.dphHashTable);
     if(NULL == pStaDs)
     {
-      PELOG1(limLog(pMac, LOG1, FL("pStaDs is NULL"));)
+      limLog(pMac, LOG1, FL("pStaDs is NULL"));
       return;
     }
     limGetRfBand(pMac, &rfBand, psessionEntry);
@@ -2894,7 +2908,7 @@ void limProcessQuietTimeout(tpAniSirGlobal pMac)
         return;
     }
 
-  PELOG1(limLog(pMac, LOG1, FL("quietState = %d"), psessionEntry->gLimSpecMgmt.quietState);)
+  limLog(pMac, LOG1, FL("quietState = %d"), psessionEntry->gLimSpecMgmt.quietState);
   switch( psessionEntry->gLimSpecMgmt.quietState )
   {
     case eLIM_QUIET_BEGIN:
@@ -3015,7 +3029,7 @@ void limProcessQuietBssTimeout( tpAniSirGlobal pMac )
         return;
     }
 
-  PELOG1(limLog(pMac, LOG1, FL("quietState = %d"), psessionEntry->gLimSpecMgmt.quietState);)
+  limLog(pMac, LOG1, FL("quietState = %d"), psessionEntry->gLimSpecMgmt.quietState);
   if (eLIM_AP_ROLE == psessionEntry->limSystemRole)
   {
   }
@@ -3298,8 +3312,8 @@ void limSwitchPrimaryChannel(tpAniSirGlobal pMac, tANI_U8 newChannel,tpPESession
     tANI_U32 localPwrConstraint;
 #endif
     
-    PELOG3(limLog(pMac, LOG3, FL("limSwitchPrimaryChannel: old chnl %d --> new chnl %d "),
-           psessionEntry->currentOperChannel, newChannel);)
+    limLog(pMac, LOG1, FL(" old chnl %d --> new chnl %d "),
+           psessionEntry->currentOperChannel, newChannel);
     psessionEntry->currentReqChannel = newChannel;
     psessionEntry->limRFBand = limGetRFBand(newChannel);
 
@@ -5493,10 +5507,10 @@ limValidateDeltsReq(tpAniSirGlobal pMac, tpSirDeltsReq pDeltsReq, tSirMacAddr pe
 
     tsinfo = pDeltsReq->req.wmeTspecPresent ? &pDeltsReq->req.tspec.tsinfo
                                             : &pDeltsReq->req.tsinfo;
-   PELOG1(limLog(pMac, LOG1,
+   limLog(pMac, LOG1,
            FL("received DELTS_REQ message (wmeTspecPresent = %d, lleTspecPresent = %d, wsmTspecPresent = %d, tsid %d,  up %d, direction = %d)"),
            pDeltsReq->req.wmeTspecPresent, pDeltsReq->req.lleTspecPresent, pDeltsReq->req.wsmTspecPresent,
-           tsinfo->traffic.tsid, tsinfo->traffic.userPrio, tsinfo->traffic.direction);)
+           tsinfo->traffic.tsid, tsinfo->traffic.userPrio, tsinfo->traffic.direction);
 
        // if no Access Control, ignore the request
 
@@ -5867,9 +5881,9 @@ if((psessionEntry = peFindSessionByBssid(pMac,pDelTsParam->bssId,&sessionId))== 
     PELOGE(limLog(pMac, LOGE, FL("limValidateDeltsReq failed"));)
     goto error2;
   }
-  PELOG1(limLog(pMac, LOG1, "Sent DELTS request to station with "
-         "assocId = %d MacAddr = "MAC_ADDRESS_STR,
-         pDelTsReq->aid, MAC_ADDR_ARRAY(peerMacAddr));)
+  limLog(pMac, LOG1, "Sent DELTS request to station with "
+                "assocId = %d MacAddr = "MAC_ADDRESS_STR,
+                pDelTsReq->aid, MAC_ADDR_ARRAY(peerMacAddr));
 
   limSendDeltsReqActionFrame(pMac, peerMacAddr, pDelTsReq->req.wmeTspecPresent, &pDelTsReq->req.tsinfo, &pDelTsReq->req.tspec,
           psessionEntry);
@@ -6255,6 +6269,8 @@ tSirMsgQ msgQ;
   if (!(IS_HWSTA_IDX(pSta->staIndex)))
   {
     retCode = eHAL_STATUS_FAILURE;
+    limLog( pMac, LOGE,
+        FL( "Sta Id is not HW Sta Id, return code is %d " ), retCode);
     goto returnFailure;
   }
 #endif //WLAN_SOFTAP_VSTA_FEATURE
@@ -6729,11 +6745,11 @@ void limFrameTransmissionControl(tpAniSirGlobal pMac, tLimQuietTxMode type, tLim
 
     if (mode == eLIM_STOP_TX)
         {
-            PELOG1(limLog(pMac, LOG1, FL("Stopping the transmission of all packets, indicated softmac"));)
+            limLog(pMac, LOG1, FL("Stopping the transmission of all packets, indicated softmac"));
         }
     else
         {
-            PELOG1(limLog(pMac, LOG1, FL("Resuming the transmission of all packets, indicated softmac"));)
+            limLog(pMac, LOG1, FL("Resuming the transmission of all packets, indicated softmac"));
         }
     return;
 }
@@ -7047,7 +7063,7 @@ void limSetTspecUapsdMask(tpAniSirGlobal pMac, tSirMacTSInfo *pTsInfo, tANI_U32 
     tANI_U16  direction = pTsInfo->traffic.direction;  
     tANI_U8   ac = upToAc(userPrio);
 
-    PELOG1(limLog(pMac, LOG1, FL(" Set UAPSD mask for AC %d, direction %d, action=%d (1=set,0=clear) "),ac, direction, action );)
+    limLog(pMac, LOG1, FL(" Set UAPSD mask for AC %d, direction %d, action=%d (1=set,0=clear) "),ac, direction, action );
 
     /* Converting AC to appropriate Uapsd Bit Mask
      * AC_BE(0) --> UAPSD_BITOFFSET_ACVO(3)
@@ -7267,14 +7283,21 @@ void limHandleHeartBeatFailureTimeout(tpAniSirGlobal pMac)
             psessionEntry = &pMac->lim.gpSession[i];
             if(psessionEntry->LimHBFailureStatus == eANI_BOOLEAN_TRUE)
             {
-                limLog(pMac, LOGE, FL("Probe_hb_failure: SME %d, MLME %d, HB-Count %d"),psessionEntry->limSmeState,
-                        psessionEntry->limMlmState, psessionEntry->LimRxedBeaconCntDuringHB);
+                limLog(pMac, LOGE,
+                        FL("Probe_hb_failure: SME %d, MLME %d, HB-Count %d BCN count %d"),
+                        psessionEntry->limSmeState, psessionEntry->limMlmState,
+                        psessionEntry->LimRxedBeaconCntDuringHB,
+                        psessionEntry->currentBssBeaconCnt);
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_LIM //FEATURE_WLAN_DIAG_SUPPORT
                 limDiagEventReport(pMac, WLAN_PE_DIAG_HB_FAILURE_TIMEOUT, psessionEntry, 0, 0);
 #endif
                 if (psessionEntry->limMlmState == eLIM_MLM_LINK_ESTABLISHED_STATE)
                 {
-                    if ((!LIM_IS_CONNECTION_ACTIVE(psessionEntry)) &&
+                    /* Disconnect even if we have not received a single beacon
+                     * after connection.
+                     */
+                    if (((!LIM_IS_CONNECTION_ACTIVE(psessionEntry)) ||
+                         (0 == psessionEntry->currentBssBeaconCnt)) &&
                         (psessionEntry->limSmeState != eLIM_SME_WT_DISASSOC_STATE)&&
                         (psessionEntry->limSmeState != eLIM_SME_WT_DEAUTH_STATE))
                     {
@@ -8181,6 +8204,19 @@ void limInitOBSSScanParams(tpAniSirGlobal pMac,
     }
     psessionEntry->obssHT40ScanParam.OBSSScanPassiveTotalPerChannel =
                                                              cfgValue;
+
+    if (wlan_cfgGetInt(pMac,
+         WNI_CFG_OBSS_HT40_WIDTH_CHANNEL_TRANSITION_DELAY_FACTOR, &cfgValue)
+         != eSIR_SUCCESS)
+    {
+       limLog(pMac, LOGE, FL("Fail to retrieve"
+              "WNI_CFG_OBSS_HT40_WIDTH_CHANNEL_TRANSITION_DELAY_FACTOR value"));
+       return ;
+    }
+    psessionEntry->obssHT40ScanParam.BSSWidthChannelTransitionDelayFactor =
+                                                                   cfgValue;
+
+
     if (wlan_cfgGetInt(pMac, WNI_CFG_OBSS_HT40_SCAN_ACTIVITY_THRESHOLD ,
                        &cfgValue) != eSIR_SUCCESS)
     {

@@ -50,7 +50,6 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/wireless.h>
-#include <linux/ratelimit.h>
 #include <macTrace.h>
 #include <wlan_hdd_includes.h>
 #include <wlan_btc_svc.h>
@@ -191,6 +190,7 @@ static const hdd_freq_chan_map_t freq_chan_map[] = { {2412, 1}, {2417, 2},
 #endif
 #define WE_SET_AP_WPS_IE     4  //This is called in station mode to set probe rsp ie.
 #define WE_SET_CONFIG        5
+#define WE_SET_ENCRYPT_MSG   6
 
 /* Private ioctls and their sub-ioctls */
 #define WLAN_PRIV_SET_THREE_INT_GET_NONE   (SIOCIWFIRSTPRIV + 4)
@@ -1339,7 +1339,7 @@ v_U8_t* wlan_hdd_get_vendor_oui_ie_ptr(v_U8_t *oui, v_U8_t oui_size, v_U8_t *ie,
     return NULL;
 }
 
-static int iw_set_commit(struct net_device *dev, struct iw_request_info *info,
+static int __iw_set_commit(struct net_device *dev, struct iw_request_info *info,
                          union iwreq_data *wrqu, char *extra)
 {
     hddLog( LOG1, "In %s", __func__);
@@ -1347,7 +1347,19 @@ static int iw_set_commit(struct net_device *dev, struct iw_request_info *info,
     return 0;
 }
 
-static int iw_get_name(struct net_device *dev,
+static int iw_set_commit(struct net_device *dev, struct iw_request_info *info,
+                         union iwreq_data *wrqu, char *extra)
+{
+    int ret;
+
+    vos_ssr_protect(__func__);
+    ret = __iw_set_commit(dev, info, wrqu, extra);
+    vos_ssr_unprotect(__func__);
+
+    return ret;
+}
+
+static int __iw_get_name(struct net_device *dev,
                        struct iw_request_info *info,
                        char *wrqu, char *extra)
 {
@@ -1356,6 +1368,19 @@ static int iw_get_name(struct net_device *dev,
     strlcpy(wrqu, "Qcom:802.11n", IFNAMSIZ);
     EXIT();
     return 0;
+}
+
+static int iw_get_name(struct net_device *dev,
+                       struct iw_request_info *info,
+                       char *wrqu, char *extra)
+{
+    int ret;
+
+    vos_ssr_protect(__func__);
+    ret = __iw_get_name(dev, info, wrqu, extra);
+    vos_ssr_unprotect(__func__);
+
+    return ret;
 }
 
 static int __iw_set_mode(struct net_device *dev,
@@ -2407,7 +2432,7 @@ static int iw_set_frag_threshold(struct net_device *dev,
    return ret;
 }
 
-static int iw_get_power_mode(struct net_device *dev,
+static int __iw_get_power_mode(struct net_device *dev,
                              struct iw_request_info *info,
                              union iwreq_data *wrqu, char *extra)
 {
@@ -2415,12 +2440,37 @@ static int iw_get_power_mode(struct net_device *dev,
    return -EOPNOTSUPP;
 }
 
-static int iw_set_power_mode(struct net_device *dev,
+static int iw_get_power_mode(struct net_device *dev,
+                             struct iw_request_info *info,
+                             union iwreq_data *wrqu, char *extra)
+{
+   int ret;
+
+   vos_ssr_protect(__func__);
+   ret = __iw_get_power_mode(dev, info, wrqu, extra);
+   vos_ssr_unprotect(__func__);
+
+   return ret;
+}
+static int __iw_set_power_mode(struct net_device *dev,
                              struct iw_request_info *info,
                              union iwreq_data *wrqu, char *extra)
 {
     ENTER();
     return -EOPNOTSUPP;
+}
+
+static int iw_set_power_mode(struct net_device *dev,
+                             struct iw_request_info *info,
+                             union iwreq_data *wrqu, char *extra)
+{
+   int ret;
+
+   vos_ssr_protect(__func__);
+   ret = __iw_set_power_mode(dev, info, wrqu, extra);
+   vos_ssr_unprotect(__func__);
+
+   return ret;
 }
 
 static int __iw_get_range(struct net_device *dev,
@@ -3111,6 +3161,206 @@ static int iw_softap_set_channel_range( struct net_device *dev,
     return ret;
 }
 
+static uint8 chartohex(char c)
+{
+    uint8 val = 0;
+    if (c >= '0' && c <= '9')
+        val = c - '0';
+    else if (c >= 'a' && c <= 'f')
+        val = c - 'a' + 10;
+    else if (c >= 'A' && c <= 'F')
+        val = c - 'A' + 10;
+    else
+        hddLog(VOS_TRACE_LEVEL_ERROR, "Not a valid hex char");
+
+    return val;
+}
+
+uint8 getByte(char **buf)
+{
+    uint8 byte = 0;
+    char *temp = *buf;
+    byte = chartohex(*temp) * 16;
+    temp++;
+    byte += chartohex(*temp);
+    temp++;
+    *buf = temp;
+    return byte;
+}
+
+static void parse_Bufferforpkt(tSirpkt80211 *pkt, u8 *pBuffer, u16 len)
+{
+    tSir80211Header *macHeader;
+    int i = 0, j = 0, length = 0;
+    uint8 byte = 0;
+    char *temp = pBuffer;
+    uint16 fragNum = 0;
+
+    macHeader = &pkt->macHeader;
+
+    pkt->encParams.keyParams.key[0].keyId = *temp - '0';
+
+    temp++;
+
+    hddLog(VOS_TRACE_LEVEL_ERROR, "Input Message to encrypt");
+    hddLog(VOS_TRACE_LEVEL_ERROR, "Key Id : %d",
+            pkt->encParams.keyParams.key[0].keyId);
+
+    for (i = 0; i< 16; i++) {
+        pkt->encParams.keyParams.key[0].key[i]
+            = getByte(&temp);
+    }
+
+    print_hex_dump(KERN_INFO, "Key : ", DUMP_PREFIX_NONE, 16, 1,
+            &pkt->encParams.keyParams.key[0].key[0], 16, 0);
+
+    for (i = 0; i< 6; i++) {
+        pkt->encParams.pn[i]
+            = getByte(&temp);
+    }
+
+    print_hex_dump(KERN_INFO, "PN : ", DUMP_PREFIX_NONE, 16, 1,
+            &pkt->encParams.pn[0], 6, 0);
+
+    for (i = 0, j= 5; i< 3; i++, j--) {
+        byte = pkt->encParams.pn[i];
+        pkt->encParams.pn[i] = pkt->encParams.pn[j];
+        pkt->encParams.pn[j] = byte;
+    }
+
+    length = getByte(&temp);
+
+    byte = getByte(&temp);
+
+    macHeader->frameCtrl.protVer  = byte & 0x3;
+    macHeader->frameCtrl.type     = (byte >> 2) & 0x3;
+    macHeader->frameCtrl.subType  = (byte >> 4) & 0xF;
+
+    byte = getByte(&temp);
+    macHeader->frameCtrl.toDS     = (byte) & 0x1;
+    macHeader->frameCtrl.fromDS   = (byte >> 1) & 0x1;
+    macHeader->frameCtrl.moreFrag = (byte >> 2) & 0x1;
+    macHeader->frameCtrl.retry    = (byte >> 3) & 0x1;
+    macHeader->frameCtrl.powerMgmt = (byte >> 4) & 0x1;
+    macHeader->frameCtrl.moreData = (byte >> 5) & 0x1;
+    macHeader->frameCtrl.wep      = (byte >> 6) & 0x1;
+    macHeader->frameCtrl.order    = (byte >> 7) & 0x1;
+
+    hddLog(VOS_TRACE_LEVEL_INFO, "macHeader->frameCtrl.protVer    : %x "
+            "macHeader->frameCtrl.type       : %x "
+            "macHeader->frameCtrl.subType    : %x "
+            "macHeader->frameCtrl.toDS       : %x "
+            "macHeader->frameCtrl.fromDS     : %x "
+            "macHeader->frameCtrl.moreFrag   : %x "
+            "macHeader->frameCtrl.retry      : %x "
+            "macHeader->frameCtrl.powerMgmt  : %x "
+            "macHeader->frameCtrl.MoreData   : %x "
+            "macHeader->frameCtrl.wep        : %x "
+            "macHeader->frameCtrl.order      : %x "
+            , macHeader->frameCtrl.protVer
+            , macHeader->frameCtrl.type
+            , macHeader->frameCtrl.subType
+            , macHeader->frameCtrl.toDS
+            , macHeader->frameCtrl.fromDS
+            , macHeader->frameCtrl.moreFrag
+            , macHeader->frameCtrl.retry
+            , macHeader->frameCtrl.powerMgmt
+            , macHeader->frameCtrl.moreData
+            , macHeader->frameCtrl.wep
+            , macHeader->frameCtrl.order);
+
+
+    macHeader->usDurationId = getByte(&temp);
+    macHeader->usDurationId += getByte(&temp) << 8;
+
+    macHeader->vA1[0]       = getByte(&temp);
+    macHeader->vA1[1]       = getByte(&temp);
+    macHeader->vA1[2]       = getByte(&temp);
+    macHeader->vA1[3]       = getByte(&temp);
+    macHeader->vA1[4]       = getByte(&temp);
+    macHeader->vA1[5]       = getByte(&temp);
+
+    macHeader->vA2[0]       = getByte(&temp);
+    macHeader->vA2[1]       = getByte(&temp);
+    macHeader->vA2[2]       = getByte(&temp);
+    macHeader->vA2[3]       = getByte(&temp);
+    macHeader->vA2[4]       = getByte(&temp);
+    macHeader->vA2[5]       = getByte(&temp);
+
+    macHeader->vA3[0]       = getByte(&temp);
+    macHeader->vA3[1]       = getByte(&temp);
+    macHeader->vA3[2]       = getByte(&temp);
+    macHeader->vA3[3]       = getByte(&temp);
+    macHeader->vA3[4]       = getByte(&temp);
+    macHeader->vA3[5]       = getByte(&temp);
+
+    macHeader->sSeqCtrl = getByte(&temp);
+    fragNum = macHeader->sSeqCtrl & 0xF;
+    macHeader->sSeqCtrl >>= 4;
+
+    macHeader->sSeqCtrl += getByte(&temp) << 4;
+
+    macHeader->sSeqCtrl |= fragNum << 12;
+
+    if (length == 30 || length == 32) {
+        macHeader->optvA4[0]       = getByte(&temp);
+        macHeader->optvA4[1]       = getByte(&temp);
+        macHeader->optvA4[2]       = getByte(&temp);
+        macHeader->optvA4[3]       = getByte(&temp);
+        macHeader->optvA4[4]       = getByte(&temp);
+        macHeader->optvA4[5]       = getByte(&temp);
+    }
+
+    if (length == 26 || length == 32) {
+        macHeader->usQosCtrl = getByte(&temp);
+        macHeader->usQosCtrl += getByte(&temp) << 8;
+    }
+
+    print_hex_dump(KERN_INFO, "Header : ", DUMP_PREFIX_NONE, 16, 1,
+            (char *)&pkt->macHeader, sizeof(tSir80211Header), 0);
+
+    //parse payload
+    length = getByte(&temp);
+    length += getByte(&temp) << 8;
+    hddLog(VOS_TRACE_LEVEL_INFO,"Payload length : %d", length);
+
+    pkt->data.length = length;
+
+    for (i = 0; i< length; i++) {
+        pkt->data.data[i] = getByte(&temp);
+    }
+
+    print_hex_dump(KERN_INFO, "Data : ", DUMP_PREFIX_NONE, 16, 1,
+            &pkt->data.data[0], pkt->data.length, 0);
+}
+
+/**---------------------------------------------------------------------------
+
+  \brief hdd_encrypt_msg_cb() - Callback function for DISA
+  encrypt message request
+  This is an asynchronous callback function from SME when the encrypted data
+  is received
+
+  \pEncInfoRsp -> Encrypted data info
+
+  \return - 0 for success non-zero for failure
+  --------------------------------------------------------------------------*/
+static void
+hdd_encrypt_msg_cb(v_VOID_t *pUserData, v_VOID_t *pEncInfoRsp)
+{
+    tpSetEncryptedDataRspParams   pEncryptedDataRsp;
+
+    pEncryptedDataRsp = (tpSetEncryptedDataRspParams)pEncInfoRsp;
+
+    hddLog(VOS_TRACE_LEVEL_ERROR, "Encrypted Message");
+    hddLog(VOS_TRACE_LEVEL_ERROR, "Length : %d",
+            pEncryptedDataRsp->encryptedPayload.length);
+    hddLog(VOS_TRACE_LEVEL_ERROR, " Encrypted Data: ");
+    print_hex_dump(KERN_INFO, "", DUMP_PREFIX_NONE, 16, 1,
+            pEncryptedDataRsp->encryptedPayload.data,
+            pEncryptedDataRsp->encryptedPayload.length, 0);
+}
+
 VOS_STATUS  wlan_hdd_enter_bmps(hdd_adapter_t *pAdapter, int mode)
 {
    struct statsContext context;
@@ -3653,7 +3903,28 @@ static int iw_set_priv(struct net_device *dev,
    return ret;
 }
 
+static int __iw_set_nick(struct net_device *dev,
+                       struct iw_request_info *info,
+                       union iwreq_data *wrqu, char *extra)
+{
+   ENTER();
+   return 0;
+}
+
 static int iw_set_nick(struct net_device *dev,
+                       struct iw_request_info *info,
+                       union iwreq_data *wrqu, char *extra)
+{
+   int ret;
+
+   vos_ssr_protect(__func__);
+   ret = __iw_set_nick(dev, info, wrqu, extra);
+   vos_ssr_unprotect(__func__);
+
+   return ret;
+}
+
+static int __iw_get_nick(struct net_device *dev,
                        struct iw_request_info *info,
                        union iwreq_data *wrqu, char *extra)
 {
@@ -3665,14 +3936,31 @@ static int iw_get_nick(struct net_device *dev,
                        struct iw_request_info *info,
                        union iwreq_data *wrqu, char *extra)
 {
+   int ret;
+
+   vos_ssr_protect(__func__);
+   ret = __iw_get_nick(dev, info, wrqu, extra);
+   vos_ssr_unprotect(__func__);
+
+   return ret;
+}
+
+static struct iw_statistics * __get_wireless_stats(struct net_device *dev)
+{
    ENTER();
-   return 0;
+   return NULL;
 }
 
 static struct iw_statistics *get_wireless_stats(struct net_device *dev)
 {
-   ENTER();
-   return NULL;
+
+       struct iw_statistics *stats;
+
+       vos_ssr_protect(__func__);
+       stats = __get_wireless_stats(dev);
+       vos_ssr_unprotect(__func__);
+
+       return stats;
 }
 
 static int __iw_set_encode(struct net_device *dev,
@@ -4347,6 +4635,7 @@ static int __iw_set_mlme(struct net_device *dev,
                 /* Resetting authKeyMgmt */
                 (WLAN_HDD_GET_WEXT_STATE_PTR(pAdapter))->authKeyMgmt = 0;
 
+                hddLog(VOS_TRACE_LEVEL_INFO, FL("Disabling queues"));
                 netif_tx_disable(dev);
                 netif_carrier_off(dev);
 
@@ -4389,6 +4678,7 @@ static int __iw_setint_getnone(struct net_device *dev,
     hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
     tHalHandle hHal = WLAN_HDD_GET_HAL_CTX(pAdapter);
     hdd_wext_state_t  *pWextState =  WLAN_HDD_GET_WEXT_STATE_PTR(pAdapter);
+    hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
     int *value = (int *)extra;
     int sub_cmd = value[0];
     int set_value = value[1];
@@ -4397,14 +4687,14 @@ static int __iw_setint_getnone(struct net_device *dev,
 #ifdef CONFIG_HAS_EARLYSUSPEND
     v_U8_t nEnableSuspendOld;
 #endif
-    INIT_COMPLETION(pWextState->completion_var);
 
-    if ((WLAN_HDD_GET_CTX(pAdapter))->isLogpInProgress)
+    if (0 != wlan_hdd_validate_context(pHddCtx))
     {
-        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
-                                  "%s:LOGP in Progress. Ignore!!!", __func__);
+        hddLog(VOS_TRACE_LEVEL_ERROR, FL("HDD context is not valid"));
         return -EBUSY;
     }
+
+    INIT_COMPLETION(pWextState->completion_var);
 
     switch(sub_cmd)
     {
@@ -4861,6 +5151,7 @@ static int __iw_setchar_getnone(struct net_device *dev,
     hdd_config_t  *pConfig = pHddCtx->cfg_ini;
 #endif /* WLAN_FEATURE_VOWIFI */
     struct iw_point s_priv_data;
+    tSirpkt80211 *pkt;
 
     if ((WLAN_HDD_GET_CTX(pAdapter))->isLogpInProgress)
     {
@@ -4948,6 +5239,38 @@ static int __iw_setchar_getnone(struct net_device *dev,
              ret = -EINVAL;
           }
           break;
+       case WE_SET_ENCRYPT_MSG:
+          pkt = vos_mem_malloc(sizeof(tSirpkt80211));
+          if (NULL == pkt)
+          {
+              hddLog(VOS_TRACE_LEVEL_ERROR,
+                      "%s: vos_mem_alloc failed", __func__);
+              return -ENOMEM;
+          }
+
+          memset(pkt, 0, sizeof(tSirpkt80211));
+
+          if (FALSE == sme_IsFeatureSupportedByFW(DISA)) {
+              hddLog(VOS_TRACE_LEVEL_ERROR,
+                      FL("Firmware is not DISA capable"));
+              ret = -EINVAL;
+              vos_mem_free(pkt);
+              break;
+          }
+
+          parse_Bufferforpkt(pkt, pBuffer, wrqu->data.length);
+
+          ret = sme_Encryptmsgsend(pHddCtx->hHal, (u8 *)pkt,
+                  sizeof(tSirpkt80211), hdd_encrypt_msg_cb);
+          if (eHAL_STATUS_SUCCESS != ret) {
+              hddLog(VOS_TRACE_LEVEL_ERROR,
+                      FL("SENDEncryptMSG: fail to post WDA cmd"));
+              ret = -EINVAL;
+          }
+          vos_mem_free(pkt);
+
+          break;
+
        default:
        {
            hddLog(LOGE, "%s: Invalid sub command %d",__func__, sub_cmd);
@@ -8733,6 +9056,12 @@ static const struct iw_priv_args we_private_args[] = {
         IW_PRIV_TYPE_CHAR| 512,
         0,
         "setConfig" },
+
+    {   WE_SET_ENCRYPT_MSG,
+        IW_PRIV_TYPE_CHAR| 512,
+        0,
+        "encryptMsg" },
+
 
     /* handlers for main ioctl */
     {   WLAN_PRIV_SET_THREE_INT_GET_NONE,

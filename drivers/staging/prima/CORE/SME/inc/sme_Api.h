@@ -115,6 +115,7 @@ typedef struct _smeConfigParams
     tANI_U8  isAmsduSupportInAMPDU;
     tANI_U32       fEnableDebugLog;
     tANI_U32      fDeferIMPSTime;
+    tANI_U8       fBtcEnableIndTimerVal;
 } tSmeConfigParams, *tpSmeConfigParams;
 
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS
@@ -2271,12 +2272,11 @@ tANI_U8 sme_GetConcurrentOperationChannel( tHalHandle hHal );
     \brief  API to cancel MAC scan.
     \param  hHal - The handle returned by macOpen.
     \param  sessionId - sessionId for interface
-    \return VOS_STATUS
-            VOS_STATUS_E_FAILURE - failure
-            VOS_STATUS_SUCCESS  success
+    \return tSirAbortScanStatus return status abort scan
+
   ---------------------------------------------------------------------------*/
-eHalStatus sme_AbortMacScan(tHalHandle hHal, tANI_U8 sessionId,
-                            eCsrAbortReason reason);
+tSirAbortScanStatus sme_AbortMacScan(tHalHandle hHal, tANI_U8 sessionId,
+                                     eCsrAbortReason reason);
 
 /* ---------------------------------------------------------------------------
     \fn sme_GetCfgValidChannels
@@ -3303,6 +3303,17 @@ eHalStatus sme_HandoffRequest(tHalHandle hHal, tCsrHandoffRequest *pHandoffInfo)
   --------------------------------------------------------------------------*/
 VOS_STATUS sme_isSta_p2p_clientConnected(tHalHandle hHal);
 
+/*--------------------------------------------------------------------------
+  \brief hdd_is_any_session_connected() - a wrapper function to check if there
+                                           is any connected session .
+  This is a synchronous call
+  \param hHal - The handle returned by macOpen
+  \return VOS_STATUS - SME passed the request to CSR successfully.
+          Other status means SME is failed to send the request.
+  \sa
+  --------------------------------------------------------------------------*/
+VOS_STATUS sme_is_any_session_connected(tHalHandle hHal);
+
 #ifdef FEATURE_WLAN_LPHB
 /* ---------------------------------------------------------------------------
     \fn sme_LPHBConfigReq
@@ -3467,14 +3478,56 @@ VOS_STATUS sme_SendTdlsChanSwitchReq(tHalHandle hHal,
                                      tANI_S32 tdlsOffCh,
                                      tANI_S32 tdlsOffChBwOffset,
                                      tANI_U8 tdlsSwMode);
-
+eHalStatus sme_GetFwStats(tHalHandle hHal, tANI_U32 stats,
+                 void *pContext, tSirFWStatsCallback callback);
 void sme_SetMiracastMode (tHalHandle hHal,tANI_U8 mode);
 
 void sme_resetCoexEevent(tHalHandle hHal);
 
 tANI_U32 sme_GetChannelBondingMode5G(tHalHandle hHal);
 tANI_U32 sme_GetChannelBondingMode24G(tHalHandle hHal);
+#ifdef WLAN_FEATURE_AP_HT40_24G
+void sme_UpdateChannelBondingMode24G(tHalHandle hHal,
+                                      tANI_U8 cbMode);
+eHalStatus sme_SetHT2040Mode(tHalHandle hHal,
+                   tANI_U8 sessionId, tANI_U8 cbMode);
+#endif
 
 void sme_disable_dfs_channel(tHalHandle hHal, bool disable_dfs);
+
+/* HDD Callback function */
+typedef void(*pEncryptMsgRSPCb)(void *pUserData, void *infoParam);
+
+eHalStatus sme_Encryptmsgsend (tHalHandle hHal,
+                               u8 *pCmd,
+                               int length,
+                               pEncryptMsgRSPCb encCB);
+
+/* ---------------------------------------------------------------------------
+     \fn sme_RegisterBtCoexTDLSCallback
+     \brief  Used to plug in callback function
+            Which notify btcoex on or off.
+            Notification come from FW.
+     \param  hHal
+     \param  pCallbackfn : callback function pointer should be plugged in
+     \- return eHalStatus
+    -------------------------------------------------------------------------*/
+eHalStatus sme_RegisterBtCoexTDLSCallback
+(
+    tHalHandle hHal,
+    void (*pCallbackfn)(void *pAdapter, int)
+);
+
+/* ---------------------------------------------------------------------------
+    \fn smeNeighborRoamIsHandoffInProgress
+
+    \brief This function is a wrapper to call csrNeighborRoamIsHandoffInProgress
+
+    \param hHal - The handle returned by macOpen.
+
+    \return eANI_BOOLEAN_TRUE if reassoc in progress,
+            eANI_BOOLEAN_FALSE otherwise
+---------------------------------------------------------------------------*/
+tANI_BOOLEAN smeNeighborRoamIsHandoffInProgress(tHalHandle hHal);
 
 #endif //#if !defined( __SME_API_H )

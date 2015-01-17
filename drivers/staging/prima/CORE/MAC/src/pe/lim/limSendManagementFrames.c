@@ -62,7 +62,7 @@
 
 #include "wlan_qct_wda.h"
 
-
+#define IS_BROADCAST_MAC(x) (((x[0] & x[1] & x[2] & x[3] & x[4] & x[5]) == 0xff) ? 1 : 0)
 ////////////////////////////////////////////////////////////////////////
 
 tSirRetStatus limStripOffExtCapIE(tpAniSirGlobal pMac,
@@ -525,6 +525,11 @@ limSendProbeReqMgmtFrame(tpAniSirGlobal pMac,
         txFlag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME; 
     }
 
+    if( ( psessionEntry != NULL ) && ( psessionEntry->is11Gonly == true ) &&
+                                     ( !IS_BROADCAST_MAC(bssid) ) ){
+        txFlag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
+    }
+
     halstatus = halTxFrame( pMac, pPacket, ( tANI_U16 ) sizeof(tSirMacMgmtHdr) + nPayload,
                             HAL_TXRX_FRM_802_11_MGMT,
                             ANI_TXDIR_TODS,
@@ -735,6 +740,21 @@ limSendProbeRspMgmtFrame(tpAniSirGlobal pMac,
         PopulateDot11fHTCaps( pMac, psessionEntry, &pFrm->HTCaps );
         PopulateDot11fHTInfo( pMac, &pFrm->HTInfo, psessionEntry );
     }
+
+#ifdef WLAN_FEATURE_AP_HT40_24G
+    /* Populate Overlapping BSS Scan Parameters IEs,
+     * when operating in HT40 in 2.4GHz.
+     */
+    if ((pMac->roam.configParam.apHT40_24GEnabled)
+     && (IS_DOT11_MODE_HT(psessionEntry->dot11mode)))
+    {
+        PopulateDot11fOBSSScanParameters( pMac, &pFrm->OBSSScanParameters,
+                                                             psessionEntry);
+    }
+#endif
+
+    PopulateDot11fExtCap( pMac, &pFrm->ExtCap, psessionEntry);
+
 #ifdef WLAN_FEATURE_11AC
     if(psessionEntry->vhtCapability)
     {
@@ -743,7 +763,6 @@ limSendProbeRspMgmtFrame(tpAniSirGlobal pMac,
         PopulateDot11fVHTOperation( pMac, &pFrm->VHTOperation );
         // we do not support multi users yet
         //PopulateDot11fVHTExtBssLoad( pMac, &frm.VHTExtBssLoad );
-        PopulateDot11fExtCap( pMac, &pFrm->ExtCap, psessionEntry);
     }
 #endif
 
@@ -1293,8 +1312,8 @@ limSendAddtsReqActionFrame(tpAniSirGlobal    pMac,
         }
     }
 
-    PELOG3(limLog( pMac, LOG3, FL("Sending an Add TS Request frame to ") );
-    limPrintMacAddr( pMac, peerMacAddr, LOG3 );)
+    limLog( pMac, LOG1, FL("Sending an Add TS Request frame to ") );
+    limPrintMacAddr( pMac, peerMacAddr, LOG1 );
 
     if( ( SIR_BAND_5_GHZ == limGetRFBand(psessionEntry->currentOperChannel))
        || ( psessionEntry->pePersona == VOS_P2P_CLIENT_MODE ) ||
@@ -1470,6 +1489,19 @@ limSendAssocRspMgmtFrame(tpAniSirGlobal pMac,
             PopulateDot11fHTInfo( pMac, &frm.HTInfo, psessionEntry );
         }
 
+#ifdef WLAN_FEATURE_AP_HT40_24G
+        /* Populate Overlapping BSS Scan Parameters IEs,
+         * when operating in HT40 in 2.4GHz.
+         */
+        if ((pMac->roam.configParam.apHT40_24GEnabled)
+         && (IS_DOT11_MODE_HT(psessionEntry->dot11mode)))
+        {
+            PopulateDot11fOBSSScanParameters( pMac, &frm.OBSSScanParameters,
+                                                               psessionEntry);
+        }
+#endif
+
+        PopulateDot11fExtCap( pMac, &frm.ExtCap, psessionEntry);
 #ifdef WLAN_FEATURE_11AC
         if( pSta->mlmStaContext.vhtCapability && 
             psessionEntry->vhtCapability )
@@ -1477,7 +1509,6 @@ limSendAssocRspMgmtFrame(tpAniSirGlobal pMac,
             limLog( pMac, LOG1, FL("Populate VHT IEs in Assoc Response"));
             PopulateDot11fVHTCaps( pMac, &frm.VHTCaps, eSIR_TRUE );
             PopulateDot11fVHTOperation( pMac, &frm.VHTOperation);
-            PopulateDot11fExtCap( pMac, &frm.ExtCap, psessionEntry);
         }
 #endif
 
@@ -1649,16 +1680,16 @@ limSendAssocRspMgmtFrame(tpAniSirGlobal pMac,
 
     if (subType == LIM_ASSOC)
     {
-        PELOG1(limLog(pMac, LOG1,
+        limLog(pMac, LOG1,
                FL("*** Sending Assoc Resp status %d aid %d to "),
-               statusCode, aid);)
+               statusCode, aid);
     }    
     else{
-        PELOG1(limLog(pMac, LOG1,
+        limLog(pMac, LOG1,
                FL("*** Sending ReAssoc Resp status %d aid %d to "),
-               statusCode, aid);)
+               statusCode, aid);
     }
-    PELOG1(limPrintMacAddr(pMac, pMacHdr->da, LOG1);)
+    limPrintMacAddr(pMac, pMacHdr->da, LOG1);
 
     if ( addnIEPresent )
     {
@@ -1951,9 +1982,9 @@ limSendAddtsRspActionFrame(tpAniSirGlobal     pMac,
         }
     }
 
-    PELOG1(limLog( pMac, LOG1, FL("Sending an Add TS Response (status %d) to "),
+    limLog( pMac, LOG1, FL("Sending an Add TS Response (status %d) to "),
             nStatusCode );
-    limPrintMacAddr( pMac, pMacHdr->da, LOG1 );)
+    limPrintMacAddr( pMac, pMacHdr->da, LOG1 );
 
     if( ( SIR_BAND_5_GHZ == limGetRFBand(psessionEntry->currentOperChannel))
        || ( psessionEntry->pePersona == VOS_P2P_CLIENT_MODE ) ||
@@ -2141,8 +2172,8 @@ limSendDeltsReqActionFrame(tpAniSirGlobal  pMac,
         }
     }
 
-    PELOG1(limLog(pMac, LOG1, FL("Sending DELTS REQ (size %d) to "), nBytes);
-    limPrintMacAddr(pMac, pMacHdr->da, LOG1);)
+    limLog(pMac, LOG1, FL("Sending DELTS REQ (size %d) to "), nBytes);
+    limPrintMacAddr(pMac, pMacHdr->da, LOG1);
 
     if( ( SIR_BAND_5_GHZ == limGetRFBand(psessionEntry->currentOperChannel))
        || ( psessionEntry->pePersona == VOS_P2P_CLIENT_MODE ) ||
@@ -2574,6 +2605,11 @@ limSendAssocReqMgmtFrame(tpAniSirGlobal   pMac,
 
     // enable caching
     WLANTL_EnableCaching(psessionEntry->staId);
+
+    if( ( psessionEntry->is11Gonly == true ) &&
+                          ( !IS_BROADCAST_MAC(pMlmAssocReq->peerMacAddr) ) ){
+        txFlag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
+    }
 
     halstatus = halTxFrame( pMac, pPacket, ( tANI_U16 ) (sizeof(tSirMacMgmtHdr) + nPayload),
             HAL_TXRX_FRM_802_11_MGMT,
@@ -3624,11 +3660,11 @@ limSendAuthMgmtFrame(tpAniSirGlobal pMac,
     {
         vos_mem_copy(pBody, (tANI_U8 *) pAuthFrameBody, bodyLen);
 
-        PELOG1(limLog(pMac, LOG1,
+        limLog(pMac, LOG1,
            FL("*** Sending Auth seq# 3 status %d (%d) to"MAC_ADDRESS_STR),
            pAuthFrameBody->authStatusCode,
            (pAuthFrameBody->authStatusCode == eSIR_MAC_SUCCESS_STATUS),
-           MAC_ADDR_ARRAY(pMacHdr->da));)
+           MAC_ADDR_ARRAY(pMacHdr->da));
 
     }
     else
@@ -3687,12 +3723,12 @@ limSendAuthMgmtFrame(tpAniSirGlobal pMac,
         }
 #endif
 
-        PELOG1(limLog(pMac, LOG1,
+        limLog(pMac, LOG1,
            FL("*** Sending Auth seq# %d status %d (%d) to "MAC_ADDRESS_STR),
            pAuthFrameBody->authTransactionSeqNumber,
            pAuthFrameBody->authStatusCode,
            (pAuthFrameBody->authStatusCode == eSIR_MAC_SUCCESS_STATUS),
-           MAC_ADDR_ARRAY(pMacHdr->da));)
+           MAC_ADDR_ARRAY(pMacHdr->da));
     }
     PELOG2(sirDumpBuf(pMac, SIR_LIM_MODULE_ID, LOG2, pFrame, frameLen);)
 
@@ -3722,6 +3758,12 @@ limSendAuthMgmtFrame(tpAniSirGlobal pMac,
     MTRACE(macTrace(pMac, TRACE_CODE_TX_MGMT,
            psessionEntry->peSessionId,
            pMacHdr->fc.subType));
+
+    if( ( psessionEntry->is11Gonly == true ) &&
+                        ( !IS_BROADCAST_MAC(peerMacAddr) ) ){
+         txFlag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
+    }
+
     /// Queue Authentication frame in high priority WQ
     halstatus = halTxFrame( pMac, pPacket, ( tANI_U16 ) frameLen,
                             HAL_TXRX_FRM_802_11_MGMT,

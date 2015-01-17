@@ -273,8 +273,9 @@ void csrScanStopTimers(tpAniSirGlobal pMac);
 tANI_BOOLEAN csrScanRemoveNotRoamingScanCommand(tpAniSirGlobal pMac);
 //To remove fresh scan commands from the pending queue
 tANI_BOOLEAN csrScanRemoveFreshScanCommand(tpAniSirGlobal pMac, tANI_U8 sessionId);
-eHalStatus csrScanAbortMacScan(tpAniSirGlobal pMac, tANI_U8 sessionId,
-                               eCsrAbortReason reason);
+tSirAbortScanStatus csrScanAbortMacScan(tpAniSirGlobal pMac,
+                                        tANI_U8 sessionId,
+                                        eCsrAbortReason reason);
 void csrRemoveCmdFromPendingList(tpAniSirGlobal pMac, tDblLinkList *pList, 
                                               eSmeCommandType commandType );
 void csrRemoveCmdWithSessionIdFromPendingList(tpAniSirGlobal pMac,
@@ -1002,5 +1003,8 @@ eHalStatus csrRoamDelPMKIDfromCache( tpAniSirGlobal pMac, tANI_U32 sessionId,
 tANI_BOOLEAN csrElectedCountryInfo(tpAniSirGlobal pMac);
 void csrAddVoteForCountryInfo(tpAniSirGlobal pMac, tANI_U8 *pCountryCode);
 void csrClearVotesForCountryInfo(tpAniSirGlobal pMac);
+#ifdef WLAN_FEATURE_AP_HT40_24G
+eHalStatus csrSetHT2040Mode(tpAniSirGlobal pMac, tANI_U32 sessionId, tANI_U8 cbMode);
+#endif
 #endif
 

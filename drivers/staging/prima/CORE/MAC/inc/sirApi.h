@@ -146,6 +146,8 @@ typedef tANI_U8 tSirVersionString[SIR_VERSION_STRING_LEN];
 #define WLAN_EXTSCAN_MAX_RSSI_SAMPLE_SIZE     8
 #endif /* WLAN_FEATURE_EXTSCAN */
 
+#define WLAN_DISA_MAX_PAYLOAD_SIZE                1600
+
 enum eSirHostMsgTypes
 {
     SIR_HAL_APP_SETUP_NTF = SIR_HAL_HOST_MSG_START,
@@ -338,6 +340,7 @@ typedef enum eSirResultCodes
     eSIR_SME_BMPS_REQ_FAILED,
     eSIR_SME_BMPS_REQ_REJECT,
     eSIR_SME_UAPSD_REQ_FAILED,
+    eSIR_SME_UAPSD_REQ_INVALID,
     eSIR_SME_WOWL_ENTER_REQ_FAILED,
     eSIR_SME_WOWL_EXIT_REQ_FAILED,
 #if defined WLAN_FEATURE_VOWIFI_11R
@@ -677,6 +680,9 @@ typedef struct sSirSmeStartBssReq
     tANI_BOOLEAN            pmfRequired;
 #endif
 
+#ifdef WLAN_FEATURE_AP_HT40_24G
+    tANI_BOOLEAN            apHT40_24GEnabled;
+#endif
 } tSirSmeStartBssReq, *tpSirSmeStartBssReq;
 
 #define GET_IE_LEN_IN_BSS(lenInBss) ( lenInBss + sizeof(lenInBss) - \
@@ -1045,6 +1051,7 @@ typedef struct sSirSmeJoinReq
 
     tSirMacRateSet      operationalRateSet;// Has 11a or 11b rates
     tSirMacRateSet      extendedRateSet;    // Has 11g rates
+    tANI_U16            rateBitMap;
     tSirRSNie           rsnIE;                  // RSN IE to be sent in
                                                 // (Re) Association Request
 #ifdef FEATURE_WLAN_ESE
@@ -1183,6 +1190,9 @@ typedef struct sSirSmeAssocInd
     tSirMacPowerCapInfo     powerCap;
     tSirSupChnl             supportedChannels;
     tAniBool             wmmEnabledSta; /* if present - STA is WMM enabled */
+#ifdef WLAN_FEATURE_AP_HT40_24G
+    tAniBool             HT40MHzIntoEnabledSta; /* if present - STA Enable 40 MHz Intolerant */
+#endif
     tAniBool             reassocReq;
     // Required for indicating the frames to upper layer
     tANI_U32             beaconLength;
@@ -3416,6 +3426,28 @@ typedef struct sSirChangeBIParams
     tANI_U8        sessionId;      // Session ID
 } tSirChangeBIParams, *tpSirChangeBIParams;
 
+#ifdef WLAN_FEATURE_AP_HT40_24G
+typedef struct sSirSetHT2040Mode
+{
+    tANI_U16       messageType;
+    tANI_U16       length;
+    tANI_U8        cbMode;
+    tSirMacAddr    bssId;
+    tANI_U8        sessionId;      // Session ID
+} tSirSetHT2040Mode, *tpSirSetHT2040Mode;
+
+typedef struct sSirHT2040CoexInfoInd
+{
+    tANI_U16       messageType; //  eWNI_SME_2040_COEX_IND
+    tANI_U16       length;
+    tANI_U8        sessionId;
+    tANI_U8        HT40MHzIntolerant;
+    tANI_U8        HT20MHzBssWidthReq;
+    tANI_U8        channel_num;
+    tANI_U8        HT2040BssIntoChanReport [1]; //variable
+}tSirHT2040CoexInfoInd, *tpSirHT2040CoexInfoInd;
+#endif
+
 typedef struct sSirOBSSHT40Param
 {
    tANI_U16 OBSSScanPassiveDwellTime;
@@ -3613,6 +3645,8 @@ typedef struct sSirSmeDelStaSelfRsp
 #define SIR_COEX_IND_TYPE_ENABLE_UAPSD (6)
 #define SIR_COEX_IND_TYPE_DISABLE_UAPSD (7)
 #define SIR_COEX_IND_TYPE_CXM_FEATURES_NOTIFICATION (8)
+#define SIR_COEX_IND_TYPE_TDLS_ENABLE  (6)
+#define SIR_COEX_IND_TYPE_TDLS_DISABLE (7)
 
 typedef struct sSirSmeCoexInd
 {
@@ -4779,7 +4813,8 @@ typedef struct sSirChAvoidIndType
 
 typedef void (*pGetBcnMissRateCB)( tANI_S32 bcnMissRate,
                                    VOS_STATUS status, void *data);
-
+typedef void (*tSirFWStatsCallback)(VOS_STATUS status,
+                    tSirFwStatsResult *fwStatsRsp, void *pContext);
 typedef PACKED_PRE struct PACKED_POST
 {
    tANI_U32   msgLen;
@@ -4818,6 +4853,19 @@ typedef struct
   u32  statsClearReqMask;
   u8   stopReq;
 }tSirLLStatsClearReq, *tpSirLLStatsClearReq;
+
+typedef PACKED_PRE struct PACKED_POST
+{
+  u32 stats;
+  tSirFWStatsCallback callback;
+  void *data;
+}tSirFWStatsGetReq;
+
+typedef PACKED_PRE struct PACKED_POST
+{
+  tSirFWStatsCallback callback;
+  void *data;
+}tSirFWStatsInfo;
 
 /*---------------------------------------------------------------------------
   WLAN_HAL_LL_NOTIFY_STATS
@@ -5492,5 +5540,139 @@ typedef struct
     tANI_U16       length;
     tSirMacAddr    macAddr;
 } tSirSpoofMacAddrReq, *tpSirSpoofMacAddrReq;
+
+typedef struct
+{
+   //BIT order is most likely little endian.
+   //This structure is for netowkr-order byte array (or big-endian byte order)
+#ifndef WLAN_PAL_BIG_ENDIAN_BIT
+   tANI_U8 protVer :2;
+   tANI_U8 type :2;
+   tANI_U8 subType :4;
+
+   tANI_U8 toDS :1;
+   tANI_U8 fromDS :1;
+   tANI_U8 moreFrag :1;
+   tANI_U8 retry :1;
+   tANI_U8 powerMgmt :1;
+   tANI_U8 moreData :1;
+   tANI_U8 wep :1;
+   tANI_U8 order :1;
+
+#else
+
+   tANI_U8 subType :4;
+   tANI_U8 type :2;
+   tANI_U8 protVer :2;
+
+   tANI_U8 order :1;
+   tANI_U8 wep :1;
+   tANI_U8 moreData :1;
+   tANI_U8 powerMgmt :1;
+   tANI_U8 retry :1;
+   tANI_U8 moreFrag :1;
+   tANI_U8 fromDS :1;
+   tANI_U8 toDS :1;
+
+#endif
+
+} tSirFC;
+
+typedef struct
+{
+   /* Frame control field */
+   tSirFC   frameCtrl;
+   /* Duration ID */
+   tANI_U16 usDurationId;
+   /* Address 1 field  */
+   tSirMacAddr vA1;
+   /* Address 2 field */
+   tSirMacAddr vA2;
+   /* Address 3 field */
+   tSirMacAddr vA3;
+   /* Sequence control field */
+   tANI_U16 sSeqCtrl;
+   /* Optional A4 address */
+   tSirMacAddr optvA4;
+   /* Optional QOS control field */
+   tANI_U16  usQosCtrl;
+}tSir80211Header;
+// Definition for Encryption Keys
+//typedef struct sSirKeys
+typedef struct
+{
+    tANI_U8                  keyId;
+    tANI_U8                  unicast;     // 0 for multicast
+    tAniKeyDirection    keyDirection;
+    tANI_U8                  keyRsc[WLAN_MAX_KEY_RSC_LEN];   // Usage is unknown
+    tANI_U8                  paeRole;     // =1 for authenticator,
+                                     // =0 for supplicant
+    tANI_U16                 keyLength;
+    tANI_U8                  key[SIR_MAC_MAX_KEY_LENGTH];
+} tMacKeys, *tpMacKeys;
+
+typedef enum
+{
+    eMAC_WEP_STATIC,
+    eMAC_WEP_DYNAMIC,
+} tMacWepType;
+
+/*
+ * This is used by PE to configure the key information on a given station.
+ * When the secType is WEP40 or WEP104, the defWEPIdx is used to locate
+ * a preconfigured key from a BSS the station assoicated with; otherwise
+ * a new key descriptor is created based on the key field.
+ */
+//typedef struct
+typedef struct
+{
+    tANI_U16          staIdx;
+    tAniEdType        encType;        // Encryption/Decryption type
+    tMacWepType       wepType;        // valid only for WEP
+    tANI_U8           defWEPIdx;      // Default WEP key, valid only for static WEP, must between 0 and 3
+    tMacKeys         key[SIR_MAC_MAX_NUM_OF_DEFAULT_KEYS];            // valid only for non-static WEP encyrptions
+    tANI_U8          singleTidRc;    // 1=Single TID based Replay Count, 0=Per TID based RC
+    tANI_U8          sessionId; // PE session id for PE<->HAL interface
+} tSirSetStaKeyParams, *tpSirSetStaKeyParams;
+
+//typedef struct
+typedef struct
+{
+    tSirSetStaKeyParams keyParams;
+    tANI_U8 pn[6];
+}tSirencConfigParams;
+
+typedef struct
+{
+    tANI_U16 length;
+    tANI_U8 data[WLAN_DISA_MAX_PAYLOAD_SIZE];
+}tSirpayload;
+
+typedef struct
+{
+    tSir80211Header macHeader;
+    tSirencConfigParams encParams;
+    tSirpayload data;
+}tSirpkt80211;
+
+typedef struct
+{
+   tANI_U32 status;
+   tSirpayload  encryptedPayload;
+} tSetEncryptedDataRspParams, *tpSetEncryptedDataRspParams;
+
+typedef struct
+{
+   tANI_U16   mesgType;
+   tANI_U16   mesgLen;
+   tSetEncryptedDataRspParams   encryptedDataRsp;
+} tSirEncryptedDataRspParams, *tpSirEncryptedDataRspParams;
+
+typedef enum eSirAbortScanStatus
+{
+    eSIR_ABORT_ACTIVE_SCAN_LIST_EMPTY,
+    eSIR_ABORT_ACTIVE_SCAN_LIST_NOT_EMPTY,
+    eSIR_ABORT_SCAN_FAILURE
+}tSirAbortScanStatus;
 
 #endif /* __SIR_API_H */

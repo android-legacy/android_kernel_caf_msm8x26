@@ -311,6 +311,7 @@ VOS_STATUS hdd_enter_deep_sleep(hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter)
    long ret;
 
    //Stop the Interface TX queue.
+   hddLog(VOS_TRACE_LEVEL_INFO, FL("Disabling queues"));
    netif_tx_disable(pAdapter->dev);
    netif_carrier_off(pAdapter->dev);
 
@@ -510,12 +511,13 @@ int wlan_hdd_ipv6_changed(struct notifier_block *nb,
 {
     struct inet6_ifaddr *ifa = (struct inet6_ifaddr *)arg;
     struct net_device *ndev = ifa->idev->dev;
-    hdd_adapter_t *pAdapter =
-             container_of(nb, struct hdd_adapter_s, ipv6_notifier);
+    hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(ndev);
     hdd_context_t *pHddCtx;
     int status;
 
-    if (pAdapter && pAdapter->dev == ndev)
+    if (pAdapter && pAdapter->dev == ndev &&
+          (pAdapter->device_mode == WLAN_HDD_INFRA_STATION ||
+           pAdapter->device_mode == WLAN_HDD_P2P_CLIENT))
     {
         pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
         status = wlan_hdd_validate_context(pHddCtx);
@@ -968,11 +970,13 @@ int wlan_hdd_ipv4_changed(struct notifier_block *nb,
     struct in_device *in_dev;
 
     struct net_device *ndev = ifa->ifa_dev->dev;
-    hdd_adapter_t *pAdapter =
-             container_of(nb, struct hdd_adapter_s, ipv4_notifier);
+    hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(ndev);
     hdd_context_t *pHddCtx;
     int status;
-    if (pAdapter && pAdapter->dev == ndev)
+
+    if (pAdapter && pAdapter->dev == ndev &&
+         (pAdapter->device_mode == WLAN_HDD_INFRA_STATION ||
+          pAdapter->device_mode == WLAN_HDD_P2P_CLIENT))
     {
        pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
        status = wlan_hdd_validate_context(pHddCtx);
@@ -1387,6 +1391,7 @@ void hdd_suspend_wlan(void)
        if (pHddCtx->cfg_ini->nEnableSuspend == WLAN_MAP_SUSPEND_TO_STANDBY)
        {
           //stop the interface before putting the chip to standby
+          hddLog(VOS_TRACE_LEVEL_INFO, FL("Disabling queues"));
           netif_tx_disable(pAdapter->dev);
           netif_carrier_off(pAdapter->dev);
        }
@@ -2142,9 +2147,7 @@ VOS_STATUS hdd_wlan_re_init(void)
    pHddCtx->hdd_mcastbcast_filter_set = FALSE;
    pHddCtx->btCoexModeSet = FALSE;
    hdd_register_mcast_bcast_filter(pHddCtx);
-#ifdef FEATURE_WLAN_TDLS
    wlan_hdd_tdls_init(pHddCtx);
-#endif
    /* Register with platform driver as client for Suspend/Resume */
    vosStatus = hddRegisterPmOps(pHddCtx);
    if ( !VOS_IS_STATUS_SUCCESS( vosStatus ) )
@@ -2195,8 +2198,6 @@ err_vosclose:
        /* If we hit this, it means wlan driver is in bad state and needs
        * driver unload and load.
        */
-       if (pHddCtx)
-           pHddCtx->isLogpInProgress = FALSE;
        vos_set_reinit_in_progress(VOS_MODULE_ID_VOSS, FALSE);
        return VOS_STATUS_E_FAILURE;
    }

@@ -70,7 +70,7 @@
 
 #include <linux/wireless.h>
 #include <net/cfg80211.h>
-
+#include <vos_sched.h>
 
 #define WEXT_CSCAN_HEADER               "CSCAN S\x01\x00\x00S\x00"
 #define WEXT_CSCAN_HEADER_SIZE          12
@@ -534,6 +534,64 @@ static eHalStatus hdd_IndicateScanResult(hdd_scan_info_t *scanInfo, tCsrScanResu
 
 /**---------------------------------------------------------------------------
 
+  \brief hdd_processSpoofMacAddrRequest() -
+
+   The function is called from scan completion callback and from
+   cfg80211 vendor command
+
+  \param  - pHddCtx - Pointer to the HDD Context.
+
+  \return - 0 for success, non zero for failure
+
+  --------------------------------------------------------------------------*/
+
+VOS_STATUS hdd_processSpoofMacAddrRequest(hdd_context_t *pHddCtx)
+{
+
+    ENTER();
+
+    mutex_lock(&pHddCtx->spoofMacAddr.macSpoofingLock);
+
+    if (pHddCtx->spoofMacAddr.isEnabled) {
+        if (VOS_STATUS_SUCCESS != vos_randomize_n_bytes(
+                (void *)(&pHddCtx->spoofMacAddr.randomMacAddr.bytes[3]),
+                VOS_MAC_ADDR_LAST_3_BYTES)) {
+                hddLog(LOGE, FL("Failed to generate random Mac Addr"));
+                pHddCtx->spoofMacAddr.isEnabled = FALSE;
+                mutex_unlock(&pHddCtx->spoofMacAddr.macSpoofingLock);
+                return VOS_STATUS_E_FAILURE;
+        }
+    }
+
+    hddLog(LOG1, FL("New Mac Addr Generated "MAC_ADDRESS_STR),
+                 MAC_ADDR_ARRAY(pHddCtx->spoofMacAddr.randomMacAddr.bytes));
+
+    if (pHddCtx->scan_info.mScanPending != TRUE)
+    {
+        pHddCtx->spoofMacAddr.isReqDeferred = FALSE;
+        hddLog(LOG1, FL("Processing Spoof request now"));
+        /* Inform SME about spoof mac addr request*/
+        if ( eHAL_STATUS_SUCCESS != sme_SpoofMacAddrReq(pHddCtx->hHal,
+                &pHddCtx->spoofMacAddr.randomMacAddr))
+        {
+            hddLog(LOGE, FL("Sending Spoof request failed - Disable spoofing"));
+            pHddCtx->spoofMacAddr.isEnabled = FALSE;
+        }
+    } else
+    {
+        hddLog(LOG1, FL("Scan in Progress. Spoofing Deferred"));
+        pHddCtx->spoofMacAddr.isReqDeferred = TRUE;
+    }
+
+    mutex_unlock(&pHddCtx->spoofMacAddr.macSpoofingLock);
+
+    EXIT();
+
+    return VOS_STATUS_SUCCESS;
+}
+
+/**---------------------------------------------------------------------------
+
   \brief hdd_ScanRequestCallback() -
 
    The sme module calls this callback function once it finish the scan request
@@ -600,7 +658,7 @@ static eHalStatus hdd_ScanRequestCallback(tHalHandle halHandle, void *pContext,
 
 /**---------------------------------------------------------------------------
 
-  \brief iw_set_scan() -
+  \brief __iw_set_scan() -
 
    This function process the scan request from the wpa_supplicant
    and set the scan request to the SME
@@ -614,7 +672,7 @@ static eHalStatus hdd_ScanRequestCallback(tHalHandle halHandle, void *pContext,
   --------------------------------------------------------------------------*/
 
 
-int iw_set_scan(struct net_device *dev, struct iw_request_info *info,
+int __iw_set_scan(struct net_device *dev, struct iw_request_info *info,
                  union iwreq_data *wrqu, char *extra)
 {
    hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev) ;
@@ -770,9 +828,21 @@ error:
    return status;
 }
 
+int iw_set_scan(struct net_device *dev, struct iw_request_info *info,
+                union iwreq_data *wrqu, char *extra)
+{
+   int ret;
+
+   vos_ssr_protect(__func__);
+   ret = __iw_set_scan(dev, info, wrqu, extra);
+   vos_ssr_unprotect(__func__);
+
+   return ret;
+}
+
 /**---------------------------------------------------------------------------
 
-  \brief iw_get_scan() -
+  \brief __iw_get_scan() -
 
    This function returns the scan results to the wpa_supplicant
 
@@ -785,9 +855,9 @@ error:
   --------------------------------------------------------------------------*/
 
 
-int iw_get_scan(struct net_device *dev,
-                         struct iw_request_info *info,
-                         union iwreq_data *wrqu, char *extra)
+int __iw_get_scan(struct net_device *dev,
+                struct iw_request_info *info,
+                union iwreq_data *wrqu, char *extra)
 {
    hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev) ;
    hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
@@ -831,7 +901,7 @@ int iw_get_scan(struct net_device *dev,
    if (NULL == pResult)
    {
        // no scan results
-       hddLog(LOG1,"iw_get_scan: NULL Scan Result ");
+       hddLog(LOG1,"__iw_get_scan: NULL Scan Result ");
        return 0;
    }
 
@@ -853,6 +923,19 @@ int iw_get_scan(struct net_device *dev,
    EXIT();
    VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO, "%s: exit total %d BSS reported !!!",__func__, i);
    return status;
+}
+
+int iw_get_scan(struct net_device *dev,
+                struct iw_request_info *info,
+                union iwreq_data *wrqu, char *extra)
+{
+    int ret;
+
+    vos_ssr_protect(__func__);
+    ret = __iw_get_scan(dev, info, wrqu, extra);
+    vos_ssr_unprotect(__func__);
+
+    return ret;
 }
 
 #if 0
@@ -1177,9 +1260,10 @@ exit_point:
 }
 
 /* Abort any MAC scan if in progress */
-void hdd_abort_mac_scan(hdd_context_t* pHddCtx, tANI_U8 sessionId,
-                        eCsrAbortReason reason)
+tSirAbortScanStatus hdd_abort_mac_scan(hdd_context_t* pHddCtx,
+                                       tANI_U8 sessionId,
+                                       eCsrAbortReason reason)
 {
-    sme_AbortMacScan(pHddCtx->hHal, sessionId, reason);
+    return sme_AbortMacScan(pHddCtx->hHal, sessionId, reason);
 }
 

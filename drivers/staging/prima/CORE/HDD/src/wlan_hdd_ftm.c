@@ -93,41 +93,13 @@
 
 #define WCNSS_TXFIR_OFFSET          0x00018000
 
-#ifndef QWLAN_PHYDBG_BASE
-#define QWLAN_PHYDBG_BASE                   0x03004000
-#endif /* QWLAN_PHYDBG_BASE */
-
-#ifndef QWLAN_PHYDBG_TXPKT_CNT_REG
-#define QWLAN_PHYDBG_TXPKT_CNT_REG          (QWLAN_PHYDBG_BASE + 0x6C)
 #define QWLAN_PHYDBG_TXPKT_CNT_CNT_MASK     0xFFFF
-#endif
-
 
 #ifndef QWLAN_AGC_CHANNEL_FREQ_REG_OFFSET
 #define QWLAN_AGC_CHANNEL_FREQ_REG_OFFSET   0x00013c34
 #define QWLAN_AGC_CHANNEL_FREQ_FREQ_MASK    0x1FFF
 #endif /* QWLAN_AGC_CHANNEL_FREQ_REG_OFFSET */
 
-
-#ifndef QWLAN_RFAPB_BASE
-#define QWLAN_RFAPB_BASE                    0x0E02F800
-#endif /* QWLAN_RFAPB_BASE */
-
-#ifndef QWLAN_RFAPB_REV_ID_REG
-#define QWLAN_RFAPB_REV_ID_REG              (QWLAN_RFAPB_BASE + 0x00)
-#endif /* QWLAN_RFAPB_REV_ID_REG */
-
-#ifndef QWLAN_TXCTL_BASE
-#define QWLAN_TXCTL_BASE                    0x03012000
-#endif /* QWLAN_TXCTL_BASE */
-
-#ifndef QWLAN_TXCTL_FSHIFT_REG
-#define QWLAN_TXCTL_FSHIFT_REG              (QWLAN_TXCTL_BASE + 0x20)
-#define QWLAN_TXCTL_FSHIFT_BW14_OFFSET      0x02
-#define QWLAN_TXCTL_FSHIFT_BW14_MASK        0x1C
-#define QWLAN_TXCTL_FSHIFT_BW12_OFFSET      0x00
-#define QWLAN_TXCTL_FSHIFT_BW12_MASK        0x03
-#endif /* QWLAN_TXCTL_FSHIFT_REG */
 
 /* To set 4MAC addresses from given first MAC address,
  * Last byte value within given MAC address must less than 0xFF - 3 */
@@ -4469,141 +4441,6 @@ static VOS_STATUS wlan_ftm_priv_get_txpower(hdd_adapter_t *pAdapter,v_U16_t *pTx
 
 /**---------------------------------------------------------------------------
 
-  \brief wlan_ftm_priv_get_ftm_version() -
-
-   This function gets ftm driver and firmware version.
-
-  \param  - pAdapter - Pointer HDD Context.
-              - pTxRate   -  Poniter to get the Tx rate.
-
-  \return - 0 for success, non zero for failure
-
-  --------------------------------------------------------------------------*/
-
-VOS_STATUS wlan_ftm_priv_get_ftm_version(hdd_adapter_t *pAdapter,char *pftmVer)
-{
-    uPttMsgs *pMsgBody;
-    VOS_STATUS status;
-    v_U32_t reg_val;
-    char *buf = pftmVer;
-    hdd_context_t *pHddCtx = (hdd_context_t *)pAdapter->pHddCtx;
-    int lenRes = 0;
-    int lenBuf = WE_FTM_MAX_STR_LEN;
-    long ret;
-
-    if (pHddCtx->ftm.ftm_state != WLAN_FTM_STARTED)
-    {
-        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
-                   "%s:Ftm has not started. Please start the ftm. ", __func__);
-        return VOS_STATUS_E_FAILURE;
-    }
-
-    if (NULL == pMsgBuf)
-    {
-        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
-                   "%s:pMsgBuf is NULL", __func__);
-        return VOS_STATUS_E_NOMEM;
-    }
-    vos_mem_set(pMsgBuf, sizeof(tPttMsgbuffer), 0);
-    init_completion(&pHddCtx->ftm.ftm_comp_var);
-    pMsgBuf->msgId = PTT_MSG_DBG_READ_REGISTER;
-    pMsgBuf->msgBodyLength = sizeof(tMsgPttDbgReadRegister) + PTT_HEADER_LENGTH;
-
-    pMsgBody = &pMsgBuf->msgBody;
-    pMsgBody->DbgReadRegister.regAddr = QWLAN_RFAPB_REV_ID_REG;
-
-    status = wlan_ftm_postmsg((v_U8_t*)pMsgBuf,pMsgBuf->msgBodyLength);
-
-    if (status != VOS_STATUS_SUCCESS)
-    {
-        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
-                   "%s:wlan_ftm_postmsg failed", __func__);
-        status = VOS_STATUS_E_FAILURE;
-        goto done;
-
-    }
-    ret = wait_for_completion_interruptible_timeout(&pHddCtx->ftm.ftm_comp_var,
-                                 msecs_to_jiffies(WLAN_FTM_COMMAND_TIME_OUT));
-    if (0 >= ret )
-    {
-        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                   FL("wait on ftm_comp_var failed %ld"), ret);
-    }
-
-    if (pMsgBuf->msgResponse != PTT_STATUS_SUCCESS)
-    {
-        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
-                   "%s:Ptt response status failed", __func__);
-        status = VOS_STATUS_E_FAILURE;
-        goto done;
-    }
-
-    reg_val = (v_U16_t)pMsgBody->DbgReadRegister.regValue;
-
-    init_completion(&pHddCtx->ftm.ftm_comp_var);
-
-    pMsgBuf->msgId = PTT_MSG_GET_BUILD_RELEASE_NUMBER;
-    pMsgBuf->msgBodyLength = sizeof(tMsgPttGetBuildReleaseNumber) + PTT_HEADER_LENGTH;
-
-    pMsgBody = &pMsgBuf->msgBody;
-
-    status = wlan_ftm_postmsg((v_U8_t*)pMsgBuf,pMsgBuf->msgBodyLength);
-
-    if (status != VOS_STATUS_SUCCESS)
-    {
-        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
-                   "%s:wlan_ftm_postmsg failed", __func__);
-        status = VOS_STATUS_E_FAILURE;
-        goto done;
-    }
-    ret = wait_for_completion_interruptible_timeout(&pHddCtx->ftm.ftm_comp_var,
-                                msecs_to_jiffies(WLAN_FTM_COMMAND_TIME_OUT));
-    if (0 >= ret )
-    {
-        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                   FL("wait on ftm_comp_var failed %ld"), ret);
-    }
-
-    lenRes = snprintf(buf, lenBuf, "%s_",WLAN_CHIP_VERSION);
-    if(lenRes < 0 || lenRes >= lenBuf)
-    {
-        status = VOS_STATUS_E_FAILURE;
-        goto done;
-    }
-
-    buf += lenRes;
-    lenBuf -= lenRes;
-
-    /*Read the RevID*/
-    lenRes = snprintf(buf, lenBuf, "%x.%x-",(v_U8_t)(reg_val >> 8), (v_U8_t)(reg_val &0x000000FF));
-    if(lenRes < 0 || lenRes >= lenBuf)
-    {
-        status = VOS_STATUS_E_FAILURE;
-        goto done;
-    }
-
-    buf += lenRes;
-    lenBuf -= lenRes;
-
-    lenRes = snprintf(buf, lenBuf, "%s-", QWLAN_VERSIONSTR);
-    if(lenRes < 0 || lenRes >= lenBuf)
-    {
-        status = VOS_STATUS_E_FAILURE;
-        goto done;
-    }
-
-    buf += lenRes;
-    lenBuf -= lenRes;
-
-
-done:
-
-    return status;
-
-}
-
-/**---------------------------------------------------------------------------
-
   \brief wlan_ftm_priv_get_txrate() -
 
    This function gets the TX rate from the halphy ptt module and
@@ -5021,7 +4858,7 @@ done:
 }
 
 /* set param sub-ioctls */
-static int iw_ftm_setchar_getnone(struct net_device *dev, struct iw_request_info *info,
+static int __iw_ftm_setchar_getnone(struct net_device *dev, struct iw_request_info *info,
                        union iwreq_data *wrqu, char *extra)
 {
     int ret,sub_cmd;
@@ -5116,7 +4953,19 @@ OUT:
     return ret;
 }
 
-static int iw_ftm_setint_getnone(struct net_device *dev, struct iw_request_info *info,
+static int iw_ftm_setchar_getnone(struct net_device *dev, struct iw_request_info *info,
+                       union iwreq_data *wrqu, char *extra)
+{
+   int ret;
+
+   vos_ssr_protect(__func__);
+   ret = __iw_ftm_setchar_getnone(dev, info, wrqu, extra);
+   vos_ssr_unprotect(__func__);
+
+   return ret;
+}
+
+static int __iw_ftm_setint_getnone(struct net_device *dev, struct iw_request_info *info,
                        union iwreq_data *wrqu, char *extra)
 {
     hdd_adapter_t *pAdapter = (netdev_priv(dev));
@@ -5292,8 +5141,19 @@ static int iw_ftm_setint_getnone(struct net_device *dev, struct iw_request_info 
     return ret;
 }
 
+static int iw_ftm_setint_getnone(struct net_device *dev, struct iw_request_info *info,
+                       union iwreq_data *wrqu, char *extra)
+{
+    int ret;
+
+    vos_ssr_protect(__func__);
+    ret = __iw_ftm_setint_getnone(dev, info, wrqu, extra);
+    vos_ssr_unprotect(__func__);
+
+    return ret;
+}
 /* get param sub-ioctls */
-static int iw_ftm_setnone_getint(struct net_device *dev, struct iw_request_info *info,
+static int __iw_ftm_setnone_getint(struct net_device *dev, struct iw_request_info *info,
                        union iwreq_data *wrqu, char *extra)
 {
     hdd_adapter_t *pAdapter = (netdev_priv(dev));
@@ -5346,7 +5206,19 @@ static int iw_ftm_setnone_getint(struct net_device *dev, struct iw_request_info 
     return ret;
 }
 
-static int iw_ftm_get_char_setnone(struct net_device *dev, struct iw_request_info *info,
+static int iw_ftm_setnone_getint(struct net_device *dev, struct iw_request_info *info,
+                       union iwreq_data *wrqu, char *extra)
+{
+    int ret;
+
+    vos_ssr_protect(__func__);
+    ret = __iw_ftm_setnone_getint(dev, info, wrqu, extra);
+    vos_ssr_unprotect(__func__);
+
+    return ret;
+}
+
+static int __iw_ftm_get_char_setnone(struct net_device *dev, struct iw_request_info *info,
                        union iwreq_data *wrqu, char *extra)
 {
     int sub_cmd = wrqu->data.flags;
@@ -5377,18 +5249,6 @@ static int iw_ftm_get_char_setnone(struct net_device *dev, struct iw_request_inf
                 return -EINVAL;
             }
 
-            wrqu->data.length = strlen(extra)+1;
-            break;
-        }
-        case WE_GET_FTM_VERSION:
-        {
-            status = wlan_ftm_priv_get_ftm_version(pAdapter, extra);
-
-            if(status != VOS_STATUS_SUCCESS)
-            {
-                hddLog(VOS_TRACE_LEVEL_FATAL, "wlan_ftm_priv_get_mac_address failed =%d",status);
-                return -EINVAL;
-            }
             wrqu->data.length = strlen(extra)+1;
             break;
         }
@@ -5426,6 +5286,19 @@ static int iw_ftm_get_char_setnone(struct net_device *dev, struct iw_request_inf
     }
 
     return 0;
+}
+
+static int iw_ftm_get_char_setnone(struct net_device *dev, struct iw_request_info *info,
+                       union iwreq_data *wrqu, char *extra)
+{
+    int ret;
+
+    vos_ssr_protect(__func__);
+    ret = __iw_ftm_get_char_setnone(dev, info, wrqu, extra);
+    vos_ssr_unprotect(__func__);
+
+
+    return ret;
 }
 
 VOS_STATUS wlan_write_to_efs (v_U8_t *pData, v_U16_t data_len)
@@ -5488,7 +5361,7 @@ VOS_STATUS wlan_write_to_efs (v_U8_t *pData, v_U16_t data_len)
 }
 
 /*  action sub-ioctls */
-static int iw_ftm_setnone_getnone(struct net_device *dev, struct iw_request_info *info,
+static int __iw_ftm_setnone_getnone(struct net_device *dev, struct iw_request_info *info,
                        union iwreq_data *wrqu, char *extra)
 {
     int sub_cmd = wrqu->data.flags;
@@ -5528,7 +5401,19 @@ static int iw_ftm_setnone_getnone(struct net_device *dev, struct iw_request_info
     return ret;
 }
 
-static int iw_ftm_set_var_ints_getnone(struct net_device *dev, struct iw_request_info *info,
+static int iw_ftm_setnone_getnone(struct net_device *dev, struct iw_request_info *info,
+                       union iwreq_data *wrqu, char *extra)
+{
+    int ret;
+
+    vos_ssr_protect(__func__);
+    ret = __iw_ftm_setnone_getnone(dev, info, wrqu, extra);
+    vos_ssr_unprotect(__func__);
+
+    return ret;
+}
+
+static int __iw_ftm_set_var_ints_getnone(struct net_device *dev, struct iw_request_info *info,
         union iwreq_data *wrqu, char *extra)
 {
     hdd_adapter_t *pAdapter = (netdev_priv(dev));
@@ -5571,6 +5456,18 @@ static int iw_ftm_set_var_ints_getnone(struct net_device *dev, struct iw_request
     return 0;
 }
 
+
+static int iw_ftm_set_var_ints_getnone(struct net_device *dev, struct iw_request_info *info,
+        union iwreq_data *wrqu, char *extra)
+{
+   int ret;
+
+   vos_ssr_protect(__func__);
+   ret = __iw_ftm_set_var_ints_getnone(dev, info, wrqu, extra);
+   vos_ssr_unprotect(__func__);
+
+   return ret;
+}
 
 static const iw_handler we_ftm_private[] = {
 
@@ -5712,11 +5609,6 @@ static const struct iw_priv_args we_ftm_private_args[] = {
         0,
         IW_PRIV_TYPE_CHAR| WE_FTM_MAX_STR_LEN,
         "get_mac_address" },
-
-    {   WE_GET_FTM_VERSION,
-        0,
-        IW_PRIV_TYPE_CHAR| WE_FTM_MAX_STR_LEN,
-        "ftm_version" },
 
     {   WE_GET_TX_RATE,
         0,

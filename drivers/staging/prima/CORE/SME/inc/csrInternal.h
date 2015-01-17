@@ -671,6 +671,11 @@ typedef struct tagCsrConfig
     tANI_U8 allowDFSChannelRoam;
     tANI_BOOLEAN initialScanSkipDFSCh;
     tANI_BOOLEAN sendDeauthBeforeCon;
+#ifdef WLAN_FEATURE_AP_HT40_24G
+    tANI_BOOLEAN apHT40_24GEnabled;
+    tANI_U32 channelBondingAPMode24GHz; // Use for SAP/P2P GO 2.4GHz channel Bonding
+#endif
+    tANI_U32 nOBSSScanWidthTriggerInterval;
 }tCsrConfig;
 
 typedef struct tagCsrChannelPowerInfo
@@ -899,7 +904,8 @@ typedef struct tagCsrRoamSession
     tCsrRoamConnectedInfo connectedInfo;
     tCsrRoamProfile *pCurRoamProfile;
     tSirBssDescription *pConnectBssDesc;
-    tANI_U16 NumPmkidCache;
+    tANI_U16 NumPmkidCache; /* valid no. of pmkid in the cache */
+    tANI_U16 CurCacheIndex; /* the index in pmkidcache to write next to */
     tPmkidCacheInfo PmkidCacheInfo[CSR_MAX_PMKID_ALLOWED];
     tANI_U8 cJoinAttemps;
     //This may or may not have the up-to-date valid channel list
