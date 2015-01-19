@@ -81,8 +81,6 @@ config INPUT_HBTP_INPUT
 	  To compile this driver as a module, choose M here: the
 	  module will be called hbtp_input.
 
-endif
-
 config INPUT_PCSPKR
 	tristate "PC Speaker support"
 	depends on PCSPKR_PLATFORM

@@ -85,6 +85,12 @@ enum dsi_panel_bl_ctrl {
 	UNKNOWN_CTRL,
 };
 
+enum dsi_panel_status_mode {
+	ESD_BTA,
+	ESD_REG,
+	ESD_MAX,
+};
+
 enum dsi_ctrl_op_mode {
 	DSI_LP_MODE,
 	DSI_HS_MODE,
@@ -233,6 +239,7 @@ enum {
 
 #define DSI_EV_PLL_UNLOCKED		0x0001
 #define DSI_EV_MDP_FIFO_UNDERFLOW	0x0002
+#define DSI_EV_DSI_FIFO_EMPTY		0x0003
 #define DSI_EV_MDP_BUSY_RELEASE		0x80000000
 
 struct mdss_dsi_ctrl_pdata {
@@ -242,6 +249,7 @@ struct mdss_dsi_ctrl_pdata {
 	int (*partial_update_fnc) (struct mdss_panel_data *pdata);
 	int (*check_status) (struct mdss_dsi_ctrl_pdata *pdata);
 	int (*cmdlist_commit)(struct mdss_dsi_ctrl_pdata *ctrl, int from_mdp);
+	void (*switch_mode) (struct mdss_panel_data *pdata, int mode);
 	struct mdss_panel_data panel_data;
 	unsigned char *ctrl_base;
 	struct dss_io_data ctrl_io;
@@ -284,6 +292,11 @@ struct mdss_dsi_ctrl_pdata {
 
 	struct dsi_panel_cmds on_cmds;
 	struct dsi_panel_cmds off_cmds;
+	struct dsi_panel_cmds status_cmds;
+	u32 status_value;
+
+	struct dsi_panel_cmds video2cmd;
+	struct dsi_panel_cmds cmd2video;
 
 	struct dcs_cmd_list cmdlist;
 	struct completion dma_comp;
@@ -300,6 +313,14 @@ struct mdss_dsi_ctrl_pdata {
 
 	struct dsi_buf tx_buf;
 	struct dsi_buf rx_buf;
+	struct dsi_buf status_buf;
+	int status_mode;
+};
+
+struct dsi_status_data {
+	struct notifier_block fb_notifier;
+	struct delayed_work check_status;
+	struct msm_fb_data_type *mfd;
 };
 
 int dsi_panel_device_register(struct device_node *pan_node,
@@ -352,11 +373,17 @@ void mdss_dsi_wait4video_done(struct mdss_dsi_ctrl_pdata *ctrl);
 int mdss_dsi_cmdlist_commit(struct mdss_dsi_ctrl_pdata *ctrl, int from_mdp);
 void mdss_dsi_cmdlist_kickoff(int intf);
 int mdss_dsi_bta_status_check(struct mdss_dsi_ctrl_pdata *ctrl);
+int mdss_dsi_reg_status_check(struct mdss_dsi_ctrl_pdata *ctrl);
 bool __mdss_dsi_clk_enabled(struct mdss_dsi_ctrl_pdata *ctrl, u8 clk_type);
 
 int mdss_dsi_panel_init(struct device_node *node,
 		struct mdss_dsi_ctrl_pdata *ctrl_pdata,
 		bool cmd_cfg_cont_splash);
+int mdss_panel_get_dst_fmt(u32 bpp, char mipi_mode, u32 pixel_packing,
+				char *dst_format);
+
+int mdss_dsi_register_recovery_handler(struct mdss_dsi_ctrl_pdata *ctrl,
+		struct mdss_panel_recovery *recovery);
 
 static inline bool mdss_dsi_broadcast_mode_enabled(void)
 {
