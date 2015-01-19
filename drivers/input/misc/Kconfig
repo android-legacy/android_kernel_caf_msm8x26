@@ -761,3 +761,4 @@ config SENSORS_BMM050
         default n
         help
           BMM050 Magnetic Sensor Driver implemented by Bosch-Sensortec.
+endif

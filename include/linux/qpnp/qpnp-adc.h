@@ -257,6 +257,7 @@ enum qpnp_adc_tm_rscale_fn_type {
 	SCALE_RBATT_THERM,
 	SCALE_R_USB_ID,
 	SCALE_RPMIC_THERM,
+	SCALE_REMMC_THERM,
 	SCALE_RSCALE_NONE,
 };
 
@@ -1326,6 +1327,25 @@ int32_t qpnp_adc_tm_scale_therm_voltage_pu2(struct qpnp_vadc_chip *dev,
 int32_t qpnp_adc_tm_scale_voltage_therm_pu2(struct qpnp_vadc_chip *dev,
 				uint32_t reg, int64_t *result);
 /**
+ * qpnp_adc_tm_scale_therm_voltage_emmc() - Performs reverse calibration
+ *		and convert given temperature to voltage on supported
+ *		thermistor channel.
+ * @dev:	Structure device for qpnp vadc
+ * @param:	The input temperature values.
+ */
+int32_t qpnp_adc_tm_scale_therm_voltage_emmc(struct qpnp_vadc_chip *dev,
+				struct qpnp_adc_tm_config *param);
+/**
+ * qpnp_adc_tm_scale_voltage_therm_emmc() - Performs reverse calibration
+ *		and converts the given ADC code to temperature for
+ *		thermistor channel.
+ * @dev:	Structure device for qpnp vadc
+ * @reg:	The input ADC code.
+ * @result:	The physical measurement temperature on the thermistor.
+ */
+int32_t qpnp_adc_tm_scale_voltage_therm_emmc(struct qpnp_vadc_chip *dev,
+				uint32_t reg, int64_t *result);
+/**
  * qpnp_adc_usb_scaler() - Performs reverse calibration on the low/high
  *		voltage threshold values passed by the client.
  *		The function applies ratiometric calibration on the
@@ -1355,6 +1375,22 @@ int32_t qpnp_adc_usb_scaler(struct qpnp_vadc_chip *dev,
  *		the above calibrated voltage value.
  */
 int32_t qpnp_adc_vbatt_rscaler(struct qpnp_vadc_chip *dev,
+		struct qpnp_adc_tm_btm_param *param,
+		uint32_t *low_threshold, uint32_t *high_threshold);
+/**
+ * qpnp_adc_emmc_scaler() - Performs reverse calibration on the low/high
+ *		voltage threshold values passed by the client.
+ *		The function applies ratiometric calibration on the
+ *		voltage values.
+ * @dev:	Structure device for qpnp vadc
+ * @param:	The input parameters that contain the low/high voltage
+ *		threshold values.
+ * @low_threshold: The low threshold value that needs to be updated with
+ *		the above calibrated voltage value.
+ * @high_threshold: The low threshold value that needs to be updated with
+ *		the above calibrated voltage value.
+ */
+int32_t qpnp_adc_emmc_scaler(struct qpnp_vadc_chip *dev,
 		struct qpnp_adc_tm_btm_param *param,
 		uint32_t *low_threshold, uint32_t *high_threshold);
 /**

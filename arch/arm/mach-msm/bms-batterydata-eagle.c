@@ -114,3 +114,6 @@ struct bms_battery_data oem_batt_data = {
 	.flat_ocv_threshold_uv	= 3800000,
         .rbatt_capacitive_mohm   = 0
 };
+
+struct bms_battery_data *bms_batt_data = &oem_batt_data;
+int bms_batt_data_num = 1;
