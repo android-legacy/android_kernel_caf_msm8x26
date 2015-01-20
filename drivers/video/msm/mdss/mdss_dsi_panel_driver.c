@@ -1289,7 +1289,7 @@ static int mdss_dsi_panel_disp_on(struct mdss_panel_data *pdata)
 	if (ctrl_pdata->on_cmds.cmd_cnt && spec_pdata->disp_on_in_hs) {
 		pr_debug("%s: panel on sequence (in high speed)\n", __func__);
 		mdss_dsi_panel_wait_change(ctrl_pdata, true);
-		mdss_set_tx_power_mode(0, pdata);
+		mdss_dsi_set_tx_power_mode(0, pdata);
 		mdss_dsi_panel_cmds_send(ctrl_pdata, &ctrl_pdata->on_cmds);
 		display_onoff_state = true;
 		pr_info("%s: ctrl=%p ndx=%d\n", __func__, ctrl_pdata, ctrl_pdata->ndx);
@@ -1662,7 +1662,7 @@ static void get_uv_data(struct mdss_dsi_ctrl_pdata *ctrl_pdata,
 
 	mdss_dsi_cmd_mdp_busy(ctrl_pdata);
 	mdss_bus_bandwidth_ctrl(1);
-	mdss_dsi_clk_ctrl(ctrl_pdata, 1);
+	mdss_dsi_clk_ctrl(ctrl_pdata, DSI_ALL_CLKS, 1);
 	for (i = 0; i < ctrl_pdata->spec_pdata->uv_read_cmds.cmd_cnt; i++) {
 		if (short_response)
 			mdss_dsi_cmds_rx(ctrl_pdata, cmds, 0);
@@ -1672,7 +1672,7 @@ static void get_uv_data(struct mdss_dsi_ctrl_pdata *ctrl_pdata,
 		pos += len;
 		cmds++;
 	}
-	mdss_dsi_clk_ctrl(ctrl_pdata, 0);
+	mdss_dsi_clk_ctrl(ctrl_pdata, DSI_ALL_CLKS, 0);
 	mdss_bus_bandwidth_ctrl(0);
 	conv_uv_data(buf, param_type, u_data, v_data);
 }
