@@ -64,7 +64,8 @@ int mdss_dsi_clk_init(struct platform_device *pdev,
 		goto mdss_dsi_clk_err;
 	}
 
-	if (ctrl_pdata->panel_data.panel_info.type == MIPI_CMD_PANEL) {
+	if ((ctrl_pdata->panel_data.panel_info.type == MIPI_CMD_PANEL) ||
+		ctrl_pdata->panel_data.panel_info.mipi.dynamic_switch_enabled) {
 		ctrl_pdata->mmss_misc_ahb_clk = clk_get(dev, "core_mmss_clk");
 		if (IS_ERR(ctrl_pdata->mmss_misc_ahb_clk)) {
 			rc = PTR_ERR(ctrl_pdata->mmss_misc_ahb_clk);
@@ -216,7 +217,7 @@ int mdss_dsi_clk_div_config(struct mdss_panel_info *panel_info,
 	}
 
 	/* find the mnd settings from mnd_table entry */
-	for (; mnd_entry != mnd_table + ARRAY_SIZE(mnd_table); ++mnd_entry) {
+	for (; mnd_entry < mnd_table + ARRAY_SIZE(mnd_table); ++mnd_entry) {
 		if (((mnd_entry->lanes) == lanes) &&
 			((mnd_entry->bpp) == bpp))
 			break;

@@ -1967,7 +1967,7 @@ static int mdss_dsi_property_read_u32_var(struct device_node *np,
 	return 0;
 }
 
-static int mdss_panel_dt_get_dst_fmt(u32 bpp, char mipi_mode, u32 pixel_packing,
+int mdss_panel_get_dst_fmt(u32 bpp, char mipi_mode, u32 pixel_packing,
 				char *dst_format)
 {
 	int rc = 0;
@@ -2276,7 +2276,7 @@ static int mdss_panel_parse_dt(struct device_node *np,
 			"qcom,mdss-dsi-pixel-packing", NULL);
 		if (data && !strcmp(data, "loose"))
 			tmp = 1;
-		rc = mdss_panel_dt_get_dst_fmt(pinfo->bpp,
+		rc = mdss_panel_get_dst_fmt(pinfo->bpp,
 			pinfo->mipi.mode, tmp,
 			&pinfo->mipi.dst_format);
 		if (rc) {
