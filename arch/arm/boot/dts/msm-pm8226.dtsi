@@ -105,6 +105,7 @@
 			qcom,ibatmax-cool-ma = <0>;
 			qcom,cool-bat-mv = <4000>;						
 			//[Bug1105] E Jonny_Chan
+			qcom,ibat-calibration-enabled;
 
 			pm8226_chg_chgr: qcom,chgr@1000 {
 				status = "disabled";
