@@ -1918,9 +1918,6 @@ qpnp_chg_dc_dcin_valid_irq_handler(int irq, void *_chip)
 		chip->dc_present = dc_present;
 		if (qpnp_chg_is_otg_en_set(chip))
 			qpnp_chg_force_run_on_batt(chip, !dc_present ? 1 : 0);
-		if (!dc_present && !qpnp_chg_is_usb_chg_plugged_in(chip)) {
-			chip->delta_vddmax_mv = 0;
-			qpnp_chg_set_appropriate_vddmax(chip);
 		if (!dc_present) {
 			qpnp_chg_aicl_idc_set(chip, NO_CHANGE_LIMIT);
 			qpnp_chg_idcmax_set(chip, QPNP_CHG_I_MAX_MIN_100);
