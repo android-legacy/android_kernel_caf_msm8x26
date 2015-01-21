@@ -26,7 +26,7 @@
 #include <linux/mm.h>
 #include <linux/mutex.h>
 #include <linux/sort.h>
-#include <linux/uaccess.h>
+#include <asm/uaccess.h>
 
 #define RBCPR_BUF_LEN 8000
 #define RBCPR_STATS_MAX_SIZE SZ_2K

@@ -23,7 +23,7 @@
 #include <linux/types.h>
 #include <linux/mm.h>
 #include <linux/of.h>
-#include <linux/uaccess.h>
+#include <asm/uaccess.h>
 
 #include "rpm_stats.h"
 

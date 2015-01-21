@@ -23,7 +23,8 @@
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/types.h>
-#include <linux/uaccess.h>
+
+#include <asm/uaccess.h>
 
 #include "rpm_log.h"
 
