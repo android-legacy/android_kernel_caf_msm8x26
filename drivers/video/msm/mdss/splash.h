@@ -1,4 +1,4 @@
-#ifdef CONFIG_MACH_SONY_EAGLE
+#ifdef CONFIG_SONY_EAGLE
 #include "splash_eagle.h"
 #else
 /* Copyright (c) 2013, The Linux Foundation. All rights reserved.
