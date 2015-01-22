@@ -724,6 +724,7 @@ void __init msm8226_init_gpiomux(void)
 #endif
 }
 
+#if 0
 static void wcnss_switch_to_gpio(void)
 {
 	/* Switch MUX to GPIO */
@@ -829,4 +830,4 @@ u32 wcnss_rf_read_reg(u32 rf_reg_addr)
 
 	return rf_data_received;
 }
-
+#endif
