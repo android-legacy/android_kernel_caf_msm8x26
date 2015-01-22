@@ -4298,6 +4298,7 @@ char * get_FuelGauge_drv_version(void)
 	return FuelGauge_drv_FW_version;
 }
 /* [CCI] E- Bug# Jonny_Chan*/
+
 static int __devinit qpnp_bms_probe(struct spmi_device *spmi)
 {
 	struct qpnp_bms_chip *chip;
