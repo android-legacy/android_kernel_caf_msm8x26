@@ -1,6 +1,3 @@
-#ifdef CONFIG_MACH_SONY_EAGLE
-#include "splash_eagle.h"
-#else
 /* Copyright (c) 2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -5279,5 +5276,4 @@ char splash_bgr888_image[] = {
 	0x00, 0x00, 0x00, 0x00,
 };
 
-#endif
 #endif
