@@ -17,7 +17,7 @@
 
 #define SPLASH_IMAGE_WIDTH      540
 #define SPLASH_IMAGE_HEIGHT     960
-#define SPLASH_IMAGE_FORMAT     MDP_RGB_565
+#define SPLASH_IMAGE_FORMAT     MDP_BGR_888
 #define SPLASH_IMAGE_BPP        3
 
 char splash_bgr888_image[] = {
