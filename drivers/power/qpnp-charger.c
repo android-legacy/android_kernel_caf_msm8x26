@@ -1894,10 +1894,13 @@ qpnp_chg_usb_usbin_valid_irq_handler(int irq, void *_chip)
 					power_supply_changed(chip->usb_psy);
 				}
 			}
-			if (!qpnp_chg_is_dc_chg_plugged_in(chip)) {
-				clear_safety_timer_chg_failed(chip);
+			if (!qpnp_chg_is_dc_chg_plugged_in(chip))
 				chip->chg_done = false;
-			}
+
+			if (!qpnp_is_dc_higher_prio(chip))
+				qpnp_chg_idcmax_set(chip, chip->maxinput_dc_ma);
+
+			qpnp_chg_usb_suspend_enable(chip, 0);
 			qpnp_chg_iusbmax_set(chip, QPNP_CHG_I_MAX_MIN_100);
 			qpnp_chg_iusb_trim_set(chip, chip->usb_trim_default);
 			chip->prev_usb_max_ma = -EINVAL;
@@ -2101,10 +2104,8 @@ qpnp_chg_dc_dcin_valid_irq_handler(int irq, void *_chip)
 		}
 		if (!dc_present && (!qpnp_chg_is_usb_chg_plugged_in(chip) ||
 					qpnp_chg_is_otg_en_set(chip))) {
-			clear_safety_timer_chg_failed(chip);
 			chip->chg_done = false;
 		} else {
-			pm_stay_awake(chip->dev);
 			schedule_delayed_work(&chip->eoc_work,
 				msecs_to_jiffies(EOC_CHECK_PERIOD_MS));
 			schedule_work(&chip->soc_check_work);
