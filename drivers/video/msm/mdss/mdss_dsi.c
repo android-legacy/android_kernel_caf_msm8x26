@@ -1116,6 +1116,7 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 	case MDSS_EVENT_REGISTER_RECOVERY_HANDLER:
 		rc = mdss_dsi_register_recovery_handler(ctrl_pdata,
 			(struct mdss_panel_recovery *)arg);
+		break;
 	case MDSS_EVENT_DSI_DYNAMIC_SWITCH:
 		rc = mdss_dsi_update_panel_config(ctrl_pdata,
 					(int)(unsigned long) arg);
@@ -1762,17 +1763,16 @@ int dsi_panel_device_register(struct device_node *pan_node,
 
 	ctrl_pdata->panel_data.intf_ready = mdss_dsi_intf_ready;
 	ctrl_pdata->panel_data.event_handler = mdss_dsi_event_handler;
-	ctrl_pdata->check_status = mdss_dsi_bta_status_check;
-	ctrl_pdata->panel_data.detect = spec_pdata->detect;
-	ctrl_pdata->panel_data.update_panel = spec_pdata->update_panel;
-	ctrl_pdata->panel_data.panel_pdev = ctrl_pdev;
-#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
-	ctrl_pdata->cabc_off_cmds = spec_pdata->cabc_off_cmds[DEFAULT_CMDS];
-	ctrl_pdata->cabc_late_off_cmds =
-				spec_pdata->cabc_late_off_cmds[DEFAULT_CMDS];
-	ctrl_pdata->off_cmds = spec_pdata->off_cmds[DEFAULT_CMDS];
-#endif	/* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
+	if (ctrl_pdata->status_mode == ESD_REG)
+		ctrl_pdata->check_status = mdss_dsi_reg_status_check;
+	else if (ctrl_pdata->status_mode == ESD_BTA)
+		ctrl_pdata->check_status = mdss_dsi_bta_status_check;
+
+	if (ctrl_pdata->status_mode == ESD_MAX) {
+		pr_err("%s: Using default BTA for ESD check\n", __func__);
+		ctrl_pdata->check_status = mdss_dsi_bta_status_check;
+	}
 	if (ctrl_pdata->bklt_ctrl == BL_PWM)
 		mdss_dsi_panel_pwm_cfg(ctrl_pdata);
 

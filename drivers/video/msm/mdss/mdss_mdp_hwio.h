@@ -379,6 +379,7 @@ enum mdss_mdp_writeback_index {
 
 #define MDSS_MDP_MAX_AD_AL	65535
 #define MDSS_MDP_MAX_AD_STR	255
+#define MDSS_MDP_AD_BL_SCALE	4095
 
 #define MDSS_MDP_REG_AD_BYPASS				0x000
 #define MDSS_MDP_REG_AD_CTRL_0				0x004
@@ -519,7 +520,9 @@ enum mdss_mpd_intf_index {
 #define MDSS_MDP_REG_INTF_FRAME_COUNT			0x0AC
 #define MDSS_MDP_REG_INTF_LINE_COUNT			0x0B0
 #define MDSS_MDP_PANEL_FORMAT_RGB888			0x213F
-#define MDSS_MDP_PANEL_FORMAT_RGB666			0x21AA
+#define MDSS_MDP_PANEL_FORMAT_RGB666			0x212A
+
+#define MDSS_MDP_PANEL_FORMAT_PACK_ALIGN_MSB		BIT(7)
 
 enum mdss_mdp_pingpong_index {
 	MDSS_MDP_PINGPONG0,

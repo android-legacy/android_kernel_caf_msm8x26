@@ -197,6 +197,8 @@ static inline void mdss_mdp_cmd_clk_on(struct mdss_mdp_cmd_ctx *ctx)
 	MDSS_XLOG(ctx->pp_num, ctx->koff_cnt, ctx->clk_enabled,
 						ctx->rdptr_enabled);
 	if (!ctx->clk_enabled) {
+		mdss_bus_bandwidth_ctrl(true);
+
 		ctx->clk_enabled = 1;
 		if (cancel_delayed_work_sync(&ctx->ulps_work))
 			pr_debug("deleted pending ulps work\n");
@@ -248,6 +250,7 @@ static inline void mdss_mdp_cmd_clk_off(struct mdss_mdp_cmd_ctx *ctx)
 		mdss_mdp_ctl_intf_event
 			(ctx->ctl, MDSS_EVENT_PANEL_CLK_CTRL, (void *)0);
 		mdss_iommu_ctrl(0);
+		mdss_bus_bandwidth_ctrl(false);
 		mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF, false);
 		if (ctx->panel_on)
 			schedule_delayed_work(&ctx->ulps_work, ULPS_ENTER_TIME);
@@ -403,14 +406,6 @@ static void __mdss_mdp_cmd_ulps_work(struct work_struct *work)
 		pr_err("%s: invalid ctx\n", __func__);
 		return;
 	}
-
-	mutex_lock(&ctx->clk_mtx);
-	if (ctx->clk_enabled) {
-		mutex_unlock(&ctx->clk_mtx);
-		pr_warn("Cannot enter ulps mode if DSI clocks are on\n");
-		return;
-	}
-	mutex_unlock(&ctx->clk_mtx);
 
 	if (!ctx->panel_on) {
 		pr_err("Panel is off. skipping ULPS configuration\n");

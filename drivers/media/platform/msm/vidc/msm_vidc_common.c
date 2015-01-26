@@ -14,7 +14,6 @@
 #include <linux/jiffies.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
-#include <linux/workqueue.h>
 #include <asm/div64.h>
 #include <mach/subsystem_restart.h>
 
@@ -491,6 +490,8 @@ static void handle_session_init_done(enum command_response cmd, void *data)
 			inst->capability.hier_p = session_init_done->hier_p;
 			inst->capability.pixelprocess_capabilities =
 				call_hfi_op(hdev, get_core_capabilities);
+			inst->capability.mbs_per_frame =
+				session_init_done->mbs_per_frame;
 			inst->capability.capability_set = true;
 			inst->capability.buffer_mode[CAPTURE_PORT] =
 				session_init_done->alloc_mode_out;
@@ -1551,58 +1552,12 @@ void msm_comm_scale_clocks_and_bus(struct msm_vidc_inst *inst)
 		dprintk(VIDC_WARN,
 				"Failed to scale DDR bus. Performance might be impacted\n");
 	}
-	if (core->resources.has_ocmem) {
+	if (core->resources.ocmem_size) {
 		if (msm_comm_scale_bus(core, inst->session_type,
 					OCMEM_MEM))
 			dprintk(VIDC_WARN,
 					"Failed to scale OCMEM bus. Performance might be impacted\n");
 	}
-}
-
-static inline unsigned long get_ocmem_requirement(u32 height, u32 width)
-{
-	int num_mbs = 0;
-	num_mbs = GET_NUM_MBS(height, width);
-	/*TODO: This should be changes once the numbers are
-	 * available from firmware*/
-	return 512 * 1024;
-}
-
-static int msm_comm_unset_ocmem(struct msm_vidc_core *core)
-{
-	int rc = 0;
-	struct hfi_device *hdev;
-
-	if (!core || !core->device) {
-		dprintk(VIDC_ERR, "%s invalid parameters", __func__);
-		return -EINVAL;
-	}
-	hdev = core->device;
-
-	if (core->state == VIDC_CORE_INVALID) {
-		dprintk(VIDC_ERR,
-				"Core is in bad state. Cannot unset ocmem\n");
-		return -EIO;
-	}
-
-	init_completion(
-		&core->completions[SYS_MSG_INDEX(RELEASE_RESOURCE_DONE)]);
-
-	rc = call_hfi_op(hdev, unset_ocmem, hdev->hfi_device_data);
-	if (rc) {
-		dprintk(VIDC_INFO, "Failed to unset OCMEM on driver\n");
-		goto release_ocmem_failed;
-	}
-	rc = wait_for_completion_timeout(
-		&core->completions[SYS_MSG_INDEX(RELEASE_RESOURCE_DONE)],
-		msecs_to_jiffies(msm_vidc_hw_rsp_timeout));
-	if (!rc) {
-		dprintk(VIDC_ERR, "%s: Wait interrupted or timeout: %d\n",
-			__func__, SYS_MSG_INDEX(RELEASE_RESOURCE_DONE));
-		rc = -EIO;
-	}
-release_ocmem_failed:
-	return rc;
 }
 
 static int msm_comm_init_core_done(struct msm_vidc_inst *inst)
@@ -1668,6 +1623,7 @@ static int msm_comm_init_core(struct msm_vidc_inst *inst)
 			goto fail_load_fw;
 		}
 		core->state = VIDC_CORE_LOADED;
+		dprintk(VIDC_DBG, "Firmware downloaded\n");
 	}
 	mutex_unlock(&core->lock);
 
@@ -1705,7 +1661,6 @@ fail_scale_bus:
 
 static int msm_vidc_deinit_core(struct msm_vidc_inst *inst)
 {
-	int rc = 0;
 	struct msm_vidc_core *core;
 	struct hfi_device *hdev;
 
@@ -1729,38 +1684,27 @@ static int msm_vidc_deinit_core(struct msm_vidc_inst *inst)
 
 	mutex_lock(&core->lock);
 	if (list_empty(&core->instances)) {
-		if (core->state > VIDC_CORE_INIT) {
-			if (core->resources.has_ocmem) {
-				if (inst->state != MSM_VIDC_CORE_INVALID)
-					msm_comm_unset_ocmem(core);
-				call_hfi_op(hdev, free_ocmem,
-						hdev->hfi_device_data);
-			}
-			dprintk(VIDC_DBG, "Calling vidc_hal_core_release\n");
-			rc = call_hfi_op(hdev, core_release,
-					hdev->hfi_device_data);
-			if (rc) {
-				dprintk(VIDC_ERR,
-					"Failed to release core, id = %d\n",
-					core->id);
-				goto exit;
-			}
-		}
+		cancel_delayed_work(&core->fw_unload_work);
 
-		core->state = VIDC_CORE_UNINIT;
+		/*
+		* Delay unloading of firmware. This is useful
+		* in avoiding firmware download delays in cases where we
+		* will have a burst of back to back video playback sessions
+		* e.g. thumbnail generation.
+		*/
+		schedule_delayed_work(&core->fw_unload_work,
+			msecs_to_jiffies(core->state == VIDC_CORE_INVALID ?
+					0 : msm_vidc_firmware_unload_delay));
 
-		call_hfi_op(hdev, unload_fw, hdev->hfi_device_data);
-		if (core->resources.has_ocmem)
-			msm_comm_unvote_buses(core, DDR_MEM|OCMEM_MEM);
-		else
-			msm_comm_unvote_buses(core, DDR_MEM);
+		dprintk(VIDC_DBG, "firmware unload delayed by %u ms\n",
+			core->state == VIDC_CORE_INVALID ?
+			0 : msm_vidc_firmware_unload_delay);
 	}
 
 core_already_uninited:
 	change_inst_state(inst, MSM_VIDC_CORE_UNINIT);
-exit:
 	mutex_unlock(&core->lock);
-	return rc;
+	return 0;
 }
 
 int msm_comm_force_cleanup(struct msm_vidc_inst *inst)
@@ -1909,10 +1853,8 @@ static int msm_vidc_load_resources(int flipped_state,
 	struct msm_vidc_inst *inst)
 {
 	int rc = 0;
-	u32 ocmem_sz = 0;
 	struct hfi_device *hdev;
 	int num_mbs_per_sec = 0;
-	int height, width;
 
 	if (!inst || !inst->core || !inst->core->device) {
 		dprintk(VIDC_ERR, "%s invalid parameters", __func__);
@@ -1949,31 +1891,7 @@ static int msm_vidc_load_resources(int flipped_state,
 						inst, inst->state);
 		goto exit;
 	}
-	if (inst->core->resources.has_ocmem) {
-		height = max(inst->prop.height[CAPTURE_PORT],
-			inst->prop.height[OUTPUT_PORT]);
-		width = max(inst->prop.width[CAPTURE_PORT],
-			inst->prop.width[OUTPUT_PORT]);
-		ocmem_sz = get_ocmem_requirement(
-			height, width);
-		rc = msm_comm_scale_bus(inst->core, inst->session_type,
-					OCMEM_MEM);
-		if (!rc) {
-			mutex_lock(&inst->core->lock);
-			rc = call_hfi_op(hdev, alloc_ocmem,
-					hdev->hfi_device_data,
-					ocmem_sz);
-			mutex_unlock(&inst->core->lock);
-			if (rc) {
-				dprintk(VIDC_WARN,
-				"Failed to allocate OCMEM. Performance will be impacted\n");
-				msm_comm_unvote_buses(inst->core, OCMEM_MEM);
-			}
-		} else {
-			dprintk(VIDC_WARN,
-			"Failed to vote for OCMEM BW. Performance will be impacted\n");
-		}
-	}
+
 	rc = call_hfi_op(hdev, session_load_res, (void *) inst->session);
 	if (rc) {
 		dprintk(VIDC_ERR,
@@ -3168,6 +3086,40 @@ void msm_comm_flush_dynamic_buffers(struct msm_vidc_inst *inst)
 	mutex_unlock(&inst->lock);
 }
 
+void msm_comm_flush_pending_dynamic_buffers(struct msm_vidc_inst *inst)
+{
+	struct buffer_info *binfo = NULL;
+	struct list_head *list = NULL;
+
+	if (!inst)
+		return;
+
+	if (inst->buffer_mode_set[CAPTURE_PORT] != HAL_BUFFER_MODE_DYNAMIC)
+		return;
+
+	if (list_empty(&inst->pendingq) || list_empty(&inst->registered_bufs))
+		return;
+
+	list = &inst->registered_bufs;
+
+	/*
+	* Dynamic Buffer mode - Since pendingq is not empty
+	* no output buffers have been sent to firmware yet.
+	* Hence remove reference to all pendingq o/p buffers
+	* before flushing them.
+	*/
+
+	list_for_each_entry(binfo, list, list) {
+		if (binfo && binfo->type ==
+			V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
+			dprintk(VIDC_DBG,
+				"%s: binfo = %p device_addr = 0x%pa\n",
+				__func__, binfo, &binfo->device_addr[0]);
+			buf_ref_put(inst, binfo);
+		}
+	}
+}
+
 int msm_comm_flush(struct msm_vidc_inst *inst, u32 flags)
 {
 	int rc =  0;
@@ -3233,6 +3185,8 @@ int msm_comm_flush(struct msm_vidc_inst *inst, u32 flags)
 
 	} else {
 		if (!list_empty(&inst->pendingq)) {
+			msm_comm_flush_pending_dynamic_buffers(inst);
+
 			/*If flush is called after queueing buffers but before
 			 * streamon driver should flush the pending queue*/
 			list_for_each_safe(ptr, next, &inst->pendingq) {
@@ -3664,4 +3618,46 @@ int msm_comm_smem_get_domain_partition(struct msm_vidc_inst *inst,
 	}
 	return msm_smem_get_domain_partition(inst->mem_client, flags,
 			buffer_type, domain_num, partition_num);
+}
+
+void msm_vidc_fw_unload_handler(struct work_struct *work)
+{
+	struct msm_vidc_core *core = NULL;
+	struct hfi_device *hdev = NULL;
+	int rc = 0;
+
+	core = container_of(work, struct msm_vidc_core, fw_unload_work.work);
+	if (!core || !core->device) {
+		dprintk(VIDC_ERR, "%s - invalid work or core handle\n",
+				__func__);
+		return;
+	}
+
+	hdev = core->device;
+
+	mutex_lock(&core->lock);
+	if (list_empty(&core->instances) &&
+		core->state != VIDC_CORE_UNINIT) {
+		if (core->state > VIDC_CORE_INIT) {
+			dprintk(VIDC_DBG, "Calling vidc_hal_core_release\n");
+			rc = call_hfi_op(hdev, core_release,
+					hdev->hfi_device_data);
+			if (rc) {
+				dprintk(VIDC_ERR,
+					"Failed to release core, id = %d\n",
+					core->id);
+				return;
+			}
+		}
+
+		core->state = VIDC_CORE_UNINIT;
+
+		call_hfi_op(hdev, unload_fw, hdev->hfi_device_data);
+		dprintk(VIDC_DBG, "Firmware unloaded\n");
+		if (core->resources.ocmem_size)
+			msm_comm_unvote_buses(core, DDR_MEM|OCMEM_MEM);
+		else
+			msm_comm_unvote_buses(core, DDR_MEM);
+	}
+	mutex_unlock(&core->lock);
 }

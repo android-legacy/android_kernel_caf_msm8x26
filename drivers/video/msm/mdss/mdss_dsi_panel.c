@@ -41,6 +41,7 @@ static void mdss_dsi_panel_bklt_pwm(struct mdss_dsi_ctrl_pdata *ctrl, int level)
 {
 	int ret;
 	u32 duty;
+	u32 period_ns;
 
 	if (ctrl->pwm_bl == NULL) {
 		pr_err("%s: no PWM\n", __func__);
@@ -69,10 +70,23 @@ static void mdss_dsi_panel_bklt_pwm(struct mdss_dsi_ctrl_pdata *ctrl, int level)
 		ctrl->pwm_enabled = 0;
 	}
 
-	ret = pwm_config_us(ctrl->pwm_bl, duty, ctrl->pwm_period);
-	if (ret) {
-		pr_err("%s: pwm_config_us() failed err=%d.\n", __func__, ret);
-		return;
+	if (ctrl->pwm_period >= USEC_PER_SEC) {
+		ret = pwm_config_us(ctrl->pwm_bl, duty, ctrl->pwm_period);
+		if (ret) {
+			pr_err("%s: pwm_config_us() failed err=%d.\n",
+					__func__, ret);
+			return;
+		}
+	} else {
+		period_ns = ctrl->pwm_period * NSEC_PER_USEC;
+		ret = pwm_config(ctrl->pwm_bl,
+				level * period_ns / ctrl->bklt_max,
+				period_ns);
+		if (ret) {
+			pr_err("%s: pwm_config() failed err=%d.\n",
+					__func__, ret);
+			return;
+		}
 	}
 
 	ret = pwm_enable(ctrl->pwm_bl);
@@ -822,6 +836,8 @@ static int mdss_dsi_parse_panel_features(struct device_node *np,
 		"qcom,ulps-enabled");
 	pr_info("%s: ulps feature %s", __func__,
 		(pinfo->ulps_feature_enabled ? "enabled" : "disabled"));
+	pinfo->esd_check_enabled = of_property_read_bool(np,
+		"qcom,esd-check-enabled");
 
 	pinfo->mipi.dynamic_switch_enabled = of_property_read_bool(np,
 		"qcom,dynamic-mode-switch-enabled");
@@ -1129,6 +1145,23 @@ static int mdss_panel_parse_dt(struct device_node *np,
 
 	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->off_cmds,
 		"qcom,mdss-dsi-off-command", "qcom,mdss-dsi-off-command-state");
+
+	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->status_cmds,
+			"qcom,mdss-dsi-panel-status-command",
+				"qcom,mdss-dsi-panel-status-command-state");
+	rc = of_property_read_u32(np, "qcom,mdss-dsi-panel-status-value", &tmp);
+	ctrl_pdata->status_value = (!rc ? tmp : 0);
+
+
+	ctrl_pdata->status_mode = ESD_MAX;
+	rc = of_property_read_string(np,
+				"qcom,mdss-dsi-panel-status-check-mode", &data);
+	if (!rc) {
+		if (!strcmp(data, "bta_check"))
+			ctrl_pdata->status_mode = ESD_BTA;
+		else if (!strcmp(data, "reg_read"))
+			ctrl_pdata->status_mode = ESD_REG;
+	}
 
 	rc = mdss_dsi_parse_panel_features(np, ctrl_pdata);
 	if (rc) {
