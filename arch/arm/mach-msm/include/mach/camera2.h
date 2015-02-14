@@ -1,6 +1,3 @@
-#ifdef CONFIG_MSMB_CAMERA_EAGLE
-#include "camera2_eagle.h"
-#else
 /* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -155,5 +152,4 @@ struct msm_eeprom_board_info {
 	struct msm_eeprom_mm_t mm_data;
 };
 
-#endif
 #endif
