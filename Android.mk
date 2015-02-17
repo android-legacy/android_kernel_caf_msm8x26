@@ -15,7 +15,6 @@
 
 # Android makefile to build kernel as a part of Android Build
 
-ifneq ($(BUILD_KERNEL),)
 ifeq ($(filter-out amami aries castor eagle eagle_lte flamingo honami leo scorpion seagull sirius tianchi,$(TARGET_DEVICE)),)
 
 KERNEL_SRC := $(call my-dir)
@@ -188,4 +187,3 @@ $(file) : $(KERNEL_BIN) $(DTBS) | $(ACP)
 ALL_PREBUILT += $(INSTALLED_KERNEL_TARGET)
 
 endif # Sony AOSP devices
-endif # BUILD_KERNEL
