@@ -51,6 +51,14 @@ DHDCFLAGS += -DSUPPORT_PM2_ONLY
 DHDCFLAGS += -DCUSTOM_PNO_EVENT_LOCK_xTIME=10
 DHDCFLAGS += -DMIRACAST_AMPDU_SIZE=8
 
+#Gscan
+DHDCFLAGS += -DGSCAN_SUPPORT
+DHDCFLAGS += -DRTT_SUPPORT
+DHDCFLAGS += -DWL_VENDOR_EXT_SUPPORT
+#Link Statistics
+DHDCFLAGS += -DLINKSTAT_SUPPORT
+
+
 # Early suspend
 DHDCFLAGS += -DDHD_USE_EARLYSUSPEND
 
@@ -87,7 +95,12 @@ DHDCFLAGS += -DWL_CFG80211_VSDB_PRIORITIZE_SCAN_REQUEST
 DHDCFLAGS += -DWL_CFG80211_STA_EVENT
 DHDCFLAGS += -DWL_IFACE_COMB_NUM_CHANNELS
 DHDCFLAGS += -DWL_ENABLE_P2P_IF
+
 DHDCFLAGS += -DWL_CFG80211_ACL
+DHDCFLAGS += -DDISABLE_11H_SOFTAP
+DHDCFLAGS += -DSET_RANDOM_MAC_SOFTAP
+DHDCFLAGS += -DCUSTOM_FORCE_NODFS_FLAG
+DHDCFLAGS += -DCUSTOM_SET_SHORT_DWELL_TIME
 
 ##########################
 # driver type
@@ -104,13 +117,14 @@ ifneq ($(filter y, $(CONFIG_BCM4339) $(CONFIG_BCM4354) $(CONFIG_BCM4356)),)
   DHDCFLAGS += -DUSE_WL_TXBF
   DHDCFLAGS += -DUSE_WL_FRAMEBURST
   DHDCFLAGS += -DCUSTOM_DPC_CPUCORE=0
-  DHDCFLAGS += -DPROP_TXSTATUS_VSDB
+  DHDCFLAGS += -DMAX_AP_CLIENT_CNT=10
+  DHDCFLAGS += -DMAX_GO_CLIENT_CNT=5
 
 # New Features
   DHDCFLAGS += -DWL11U
   DHDCFLAGS += -DMFP
   DHDCFLAGS += -DDHD_ENABLE_LPC
-  DHDCFLAGS += -DCUSTOM_COUNRY_CODE
+  DHDCFLAGS += -DCUSTOM_COUNTRY_CODE
 ifneq ($(CONFIG_BCMDHD_SDIO),)
   DHDCFLAGS += -DBDC -DOOB_INTR_ONLY -DHW_OOB -DDHD_BCMEVENTS -DMMC_SDIO_ABORT
   DHDCFLAGS += -DBCMSDIO -DBCMLXSDMMC -DUSE_SDIOFIFO_IOVAR
@@ -136,6 +150,16 @@ ifneq ($(CONFIG_BCMDHD_PCIE),)
   DHDCFLAGS += -DCUSTOM_AMPDU_BA_WSIZE=64
   DHDCFLAGS += -DCUSTOM_AMPDU_MPDU=32
   DHDCFLAGS += -DCUSTOM_AMPDU_RELEASE=16
+  DHDCFLAGS += -DPROP_TXSTATUS_VSDB
+# Disable watchdog thread
+  DHDCFLAGS += -DCUSTOM_DHD_WATCHDOG_MS=0
+
+  DHDCFLAGS += -DSAR_SUPPORT
+  DHDCFLAGS += -DMAX_CNTL_TX_TIMEOUT=1
+ifneq ($(CONFIG_ARCH_MSM),)
+  DHDCFLAGS += -DMSM_PCIE_LINKDOWN_RECOVERY
+endif
+
 endif
 endif
 
@@ -155,9 +179,9 @@ KBUILD_CFLAGS += -I$(LINUXDIR)/include -I$(shell pwd)
 DHDOFILES := dhd_pno.o dhd_common.o dhd_ip.o dhd_custom_gpio.o \
 	dhd_linux.o dhd_linux_sched.o dhd_cfg80211.o dhd_linux_wq.o aiutils.o bcmevent.o \
 	bcmutils.o bcmwifi_channels.o hndpmu.o linux_osl.o sbutils.o siutils.o \
-	wl_android.o wl_cfg80211.o wl_cfgp2p.o wl_cfg_btcoex.o wldev_common.o wl_linux_mon.o  \
-	dhd_linux_platdev.o dhd_pno.o dhd_linux_wq.o wl_cfg_btcoex.o \
-	hnd_pktq.o hnd_pktpool.o
+	wl_android.o wl_roam.o wl_cfg80211.o wl_cfgp2p.o wl_cfg_btcoex.o wldev_common.o wl_linux_mon.o  \
+	dhd_linux_platdev.o dhd_pno.o dhd_rtt.o dhd_linux_wq.o wl_cfg_btcoex.o \
+	hnd_pktq.o hnd_pktpool.o wl_cfgvendor.o
 
 ifneq ($(CONFIG_BCMDHD_SDIO),)
   DHDOFILES += bcmsdh.o bcmsdh_linux.o bcmsdh_sdmmc.o bcmsdh_sdmmc_linux.o

@@ -868,16 +868,7 @@ osl_pktfree(osl_t *osh, void *p, bool send)
 		} else
 #endif
 		{
-			if (skb->destructor)
-				/* cannot kfree_skb() on hard IRQ (net/core/skbuff.c) if
-				 * destructor exists
-				 */
-				dev_kfree_skb_any(skb);
-			else
-				/* can free immediately (even in_irq()) if destructor
-				 * does not exist
-				 */
-				dev_kfree_skb(skb);
+			dev_kfree_skb_any(skb);
 		}
 #ifdef CTFPOOL
 next_skb:
@@ -1256,7 +1247,9 @@ osl_dma_alloc_consistent(osl_t *osh, uint size, uint16 align_bits, uint *alloced
 #else
 	{
 		dma_addr_t pap_lin;
-		va = pci_alloc_consistent(osh->pdev, size, &pap_lin);
+		struct pci_dev *hwdev = osh->pdev;
+
+		va = dma_alloc_coherent(&hwdev->dev, size, &pap_lin, GFP_ATOMIC);
 		*pap = (dmaaddr_t)pap_lin;
 	}
 #endif
