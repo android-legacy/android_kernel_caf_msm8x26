@@ -116,7 +116,7 @@ static struct msm_camera_i2c_client imx134_sensor_i2c_client = {
 };
 
 static const struct of_device_id imx134_dt_match[] = {
-	{.compatible = "qcom,imx134", .data = &imx134_s_ctrl},
+	{.compatible = "sne,imx134", .data = &imx134_s_ctrl},
 	{}
 };
 
@@ -124,7 +124,7 @@ MODULE_DEVICE_TABLE(of, imx134_dt_match);
 
 static struct platform_driver imx134_platform_driver = {
 	.driver = {
-		.name = "qcom,imx134",
+		.name = "sne,imx134",
 		.owner = THIS_MODULE,
 		.of_match_table = imx134_dt_match,
 	},
