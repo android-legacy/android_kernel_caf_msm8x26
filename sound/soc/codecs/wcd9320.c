@@ -5849,6 +5849,14 @@ static const struct snd_soc_dapm_widget taiko_dapm_widgets[] = {
 		SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
 
 
+	SND_SOC_DAPM_MUX_E("IIR2 INP1 MUX", TAIKO_A_CDC_IIR2_GAIN_B1_CTL, 0, 0,
+		&iir2_inp1_mux,  taiko_codec_iir_mux_event,
+		SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
+
+	SND_SOC_DAPM_MUX_E("IIR2 INP2 MUX", TAIKO_A_CDC_IIR2_GAIN_B2_CTL, 0, 0,
+		&iir2_inp2_mux,  taiko_codec_iir_mux_event,
+		SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
+
 	SND_SOC_DAPM_MUX("IIR1 INP2 MUX", SND_SOC_NOPM, 0, 0, &iir1_inp2_mux),
 	SND_SOC_DAPM_MIXER("IIR1", TAIKO_A_CDC_CLK_SD_CTL, 0, 0, NULL, 0),
 
