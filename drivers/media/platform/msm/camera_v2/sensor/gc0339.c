@@ -73,9 +73,21 @@ static struct msm_sensor_power_setting gc0339_power_setting[] = {
 			.config_val = GPIO_OUT_HIGH,
 			.delay = 1,
 		},
+		{
+			.seq_type = SENSOR_I2C_MUX,
+			.seq_val = 0,
+			.config_val = 0,
+			.delay = 0,
+		},
 };
 
 static struct msm_sensor_power_setting gc0339_power_down_setting [] = {
+		{
+			.seq_type = SENSOR_I2C_MUX,
+			.seq_val = 0,
+			.config_val = 0,
+			.delay = 0,
+		},
 		{//8. MCLK
 			.seq_type = SENSOR_CLK,
 			.seq_val = SENSOR_CAM_MCLK,
