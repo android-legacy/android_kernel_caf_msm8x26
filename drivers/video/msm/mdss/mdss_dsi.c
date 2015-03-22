@@ -703,11 +703,10 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 	mipi = &pdata->panel_info.mipi;
 
 #ifndef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
-        ret = mdss_dsi_panel_power_on(pdata, 1);
+	ret = mdss_dsi_panel_power_on(pdata, 1);
 #else
-        ret = ctrl_pdata->spec_pdata->panel_power_on(pdata, 1);
-#endif  /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
-
+	ret = ctrl_pdata->spec_pdata->panel_power_on(pdata, 1);
+#endif	/* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 	if (ret) {
 		pr_err("%s:Panel power on failed. rc=%d\n", __func__, ret);
 		return ret;
@@ -718,10 +717,10 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 		pr_err("%s: failed to enable bus clocks. rc=%d\n", __func__,
 			ret);
 #ifndef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
-	        ret = mdss_dsi_panel_power_on(pdata, 0);
+	ret = mdss_dsi_panel_power_on(pdata, 0);
 #else
-		ret = ctrl_pdata->spec_pdata->panel_power_on(pdata, 0);
-#endif  /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
+	ret = ctrl_pdata->spec_pdata->panel_power_on(pdata, 0);
+#endif	/* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 		if (ret) {
 			pr_err("%s: Panel reset failed. rc=%d\n",
 					__func__, ret);
@@ -1763,13 +1762,16 @@ int dsi_panel_device_register(struct device_node *pan_node,
 
 	ctrl_pdata->panel_data.intf_ready = mdss_dsi_intf_ready;
 	ctrl_pdata->panel_data.event_handler = mdss_dsi_event_handler;
-
+	ctrl_pdata->check_status = mdss_dsi_bta_status_check;
+	ctrl_pdata->panel_data.detect = spec_pdata->detect;
+	ctrl_pdata->panel_data.update_panel = spec_pdata->update_panel;
+	ctrl_pdata->panel_data.panel_pdev = ctrl_pdev;
 #ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
 	ctrl_pdata->cabc_off_cmds = spec_pdata->cabc_off_cmds[DEFAULT_CMDS];
 	ctrl_pdata->cabc_late_off_cmds =
 				spec_pdata->cabc_late_off_cmds[DEFAULT_CMDS];
 	ctrl_pdata->off_cmds = spec_pdata->off_cmds[DEFAULT_CMDS];
-#endif /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
+#endif	/* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 	if (ctrl_pdata->status_mode == ESD_REG)
 		ctrl_pdata->check_status = mdss_dsi_reg_status_check;

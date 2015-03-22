@@ -196,7 +196,6 @@ struct msm_fb_data_type {
 	u32 bl_scale;
 	u32 bl_min_lvl;
 	u32 unset_bl_level;
-        u32 bl_level_old;
 	u32 bl_updated;
 	u32 bl_level_scaled;
 	u32 bl_level_prev_scaled;
@@ -235,6 +234,8 @@ struct msm_fb_data_type {
 	u32 dcm_state;
 	struct list_head proc_list;
 	u32 wait_for_kickoff;
+	struct ion_client *fb_ion_client;
+	struct ion_handle *fb_ion_handle;
 
 	/* speed up wakeup */
 	/* do unblank (>150ms) on own kworker
@@ -242,8 +243,6 @@ struct msm_fb_data_type {
 	 */
 	struct workqueue_struct *unblank_kworker;
 	struct work_struct unblank_work;
-	struct ion_client *fb_ion_client;
-	struct ion_handle *fb_ion_handle;
 };
 
 static inline void mdss_fb_update_notify_update(struct msm_fb_data_type *mfd)

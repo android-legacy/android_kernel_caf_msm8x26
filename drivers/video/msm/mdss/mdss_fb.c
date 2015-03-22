@@ -45,8 +45,8 @@
 #include <linux/file.h>
 #include <linux/memory_alloc.h>
 #include <linux/kthread.h>
-#include <linux/input.h>
 #include <linux/of_address.h>
+#include <linux/input.h>
 
 #include <mach/board.h>
 #include <mach/memory.h>
@@ -55,7 +55,6 @@
 #include <mach/msm_memtypes.h>
 
 #include "mdss_fb.h"
-#include "mdss_mdp_splash_logo.h"
 #include "mdss_mdp.h"
 #include "mdss_dsi.h"
 
@@ -667,10 +666,8 @@ static int mdss_fb_probe(struct platform_device *pdev)
 		mfd->split_display = true;
 	mfd->mdp = *mdp_instance;
 	INIT_LIST_HEAD(&mfd->proc_list);
-#ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
 	mfd->unblank_kworker = NULL;
 	INIT_WORK(&mfd->unblank_work, mdss_background_unblank);
-#endif
 
 	mutex_init(&mfd->bl_lock);
 
@@ -726,39 +723,39 @@ static int mdss_fb_probe(struct platform_device *pdev)
 
 	mdss_fb_set_mdp_sync_pt_threshold(mfd);
 
+        if ((mfd->panel_info->type == MIPI_VIDEO_PANEL) ||
+                (mfd->panel_info->type == MIPI_CMD_PANEL))
+                mipi_dsi_panel_create_debugfs(mfd);
 #ifdef CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL
-	if ((mfd->panel_info->type == MIPI_VIDEO_PANEL) ||
-		(mfd->panel_info->type == MIPI_CMD_PANEL))
-		mipi_dsi_panel_create_debugfs(mfd);
-	if (mfd->index == 0) {
-		struct mdss_dsi_ctrl_pdata *ctrl_pdata;
+        if (mfd->index == 0) {
+                struct mdss_dsi_ctrl_pdata *ctrl_pdata;
 
-		/* only the primary panel, index 0, uses this kworker */
-		mfd->unblank_kworker =
-			create_singlethread_workqueue("unblanker");
+                /* only the primary panel, index 0, uses this kworker */
+                mfd->unblank_kworker =
+                        create_singlethread_workqueue("unblanker");
 
-		ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
-			panel_data);
-		if (!ctrl_pdata) {
-			pr_err("%s: Invalid input data\n", __func__);
-			return -EINVAL;
-		}
-		if (ctrl_pdata->spec_pdata) {
-			if (ctrl_pdata->spec_pdata->panel_detect) {
- 				mdss_fb_blank_sub(FB_BLANK_UNBLANK, mfd->fbi,
-					mfd->op_enable);
-				if (pdata->detect)
-					pdata->detect(pdata);
-				mdss_fb_blank_sub(FB_BLANK_POWERDOWN, mfd->fbi,
-					mfd->op_enable);
-				if (pdata->update_panel)
-					pdata->update_panel(pdata);
-			} else {
-				ctrl_pdata->spec_pdata->detected = true;
-			}
-		}
-	}
-#endif	/* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
+                ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
+                        panel_data);
+                if (!ctrl_pdata) {
+                        pr_err("%s: Invalid input data\n", __func__);
+                        return -EINVAL;
+                }
+                if (ctrl_pdata->spec_pdata) {
+                        if (ctrl_pdata->spec_pdata->panel_detect) {
+                                mdss_fb_blank_sub(FB_BLANK_UNBLANK, mfd->fbi,
+                                        mfd->op_enable);
+                                if (pdata->detect)
+                                        pdata->detect(pdata);
+                                mdss_fb_blank_sub(FB_BLANK_POWERDOWN, mfd->fbi,
+                                        mfd->op_enable);
+                                if (pdata->update_panel)
+                                        pdata->update_panel(pdata);
+                        } else {
+                                ctrl_pdata->spec_pdata->detected = true;
+                        }
+                }
+        }
+#endif  /* CONFIG_FB_MSM_MDSS_SPECIFIC_PANEL */
 
 	if (mfd->mdp.splash_init_fnc)
 		mfd->mdp.splash_init_fnc(mfd);
@@ -788,7 +785,6 @@ static void mdss_fb_set_mdp_sync_pt_threshold(struct msm_fb_data_type *mfd)
 		break;
 	}
 }
-
 static int mdss_fb_remove(struct platform_device *pdev)
 {
 	struct msm_fb_data_type *mfd;
@@ -885,7 +881,6 @@ static int mdss_fb_resume_sub(struct msm_fb_data_type *mfd)
 	INIT_COMPLETION(mfd->power_set_comp);
 	mfd->is_power_setting = true;
 	pr_debug("mdss_fb resume index=%d\n", mfd->index);
-	mdss_ensure_kworker_done(mfd->unblank_kworker);
 
 	mdss_fb_pan_idle(mfd);
 	ret = mdss_fb_send_panel_event(mfd, MDSS_EVENT_RESUME, NULL);
@@ -1183,18 +1178,10 @@ static int mdss_fb_blank_sub(int blank_mode, struct fb_info *info,
 			}
 
 			ret = mfd->mdp.off_fnc(mfd);
-			if (ret) {
+			if (ret)
 				mfd->panel_power_on = curr_pwr_state;
-				if ((pdata) && (pdata->set_backlight)) {
-					mutex_lock(&mfd->bl_lock);
-					mfd->bl_level = mfd->bl_level_old;
-					pdata->set_backlight(pdata, mfd->bl_level);
-					mutex_unlock(&mfd->bl_lock);
-				}
-			} else {
+			else 
 				mdss_fb_release_fences(mfd);
-			}
-			mfd->bl_level_old = mfd->bl_level;
 			mfd->op_enable = true;
 			complete(&mfd->power_off_comp);
 		}
