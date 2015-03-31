@@ -305,6 +305,7 @@
 		qcom,bus-width = <8>;
 		qcom,nonremovable;
 		qcom,bus-speed-mode = "HS200_1p8v", "DDR_1p8v";
+		qcom,cpu-dma-latency-us = <701>;
 
 		status = "disabled";
 	};
@@ -338,6 +339,7 @@
 		qcom,xpc;
 		qcom,bus-speed-mode = "SDR12", "SDR25", "SDR50", "DDR50", "SDR104";
 		qcom,current-limit = <800>;
+		qcom,cpu-dma-latency-us = <701>;
 
 		status = "disabled";
 	};
@@ -351,6 +353,7 @@
 		interrupt-names = "hc_irq", "pwr_irq";
 
 		qcom,bus-width = <8>;
+		qcom,cpu-dma-latency-us = <701>;
 		status = "disabled";
 	};
 
@@ -363,6 +366,7 @@
 		interrupt-names = "hc_irq", "pwr_irq";
 
 		qcom,bus-width = <4>;
+		qcom,cpu-dma-latency-us = <701>;
 		status = "disabled";
 	};
 
@@ -588,6 +592,7 @@
                 qcom,i2c-src-freq = <19200000>;
                 qcom,sda-gpio = <&msmgpio 10 0>;
                 qcom,scl-gpio = <&msmgpio 11 0>;
+		qcom,clk-ctl-xfer;
                 qcom,master-id = <86>;
 	};
 
@@ -873,6 +878,9 @@
 		qcom,hotplug-temp-hysteresis = <20>;
 		qcom,cpu-sensors = "tsens_tz_sensor5", "tsens_tz_sensor5",
 				"tsens_tz_sensor5", "tsens_tz_sensor5";
+		qcom,default-temp = <80>;
+		qcom,efuse-data = <0xfc4b8000 0x1000 23 30 0x3>;
+		qcom,efuse-temperature-map = <0x1 70>;
 		qcom,vdd-restriction-temp = <5>;
 		qcom,vdd-restriction-temp-hysteresis = <10>;
 		vdd-dig-supply = <&pm8110_s1_floor_corner>;
