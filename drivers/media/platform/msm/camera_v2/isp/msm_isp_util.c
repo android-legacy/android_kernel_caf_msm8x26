@@ -25,13 +25,11 @@
 static DEFINE_MUTEX(bandwidth_mgr_mutex);
 static struct msm_isp_bandwidth_mgr isp_bandwidth_mgr;
 
-#ifndef CONFIG_MACH_SONY_EAGLE
-#define MSM_ISP_MIN_AB 300000000
-#define MSM_ISP_MIN_IB 450000000
-#else
+/**/
+//#define MSM_ISP_MIN_AB 300000000
+//#define MSM_ISP_MIN_IB 450000000
 #define MSM_ISP_MIN_AB 450000000
 #define MSM_ISP_MIN_IB 900000000
-#endif
 
 #define VFE40_8974V2_VERSION 0x1001001A
 static struct msm_bus_vectors msm_isp_init_vectors[] = {
@@ -1006,8 +1004,7 @@ static inline void msm_isp_update_error_info(struct vfe_device *vfe_dev,
 	vfe_dev->error_info.error_mask1 |= error_mask1;
 	vfe_dev->error_info.error_count++;
 }
-
-#ifdef CONFIG_MACH_SONY_EAGLE
+/*QCT patch 20140627 S add*/
 static inline void msm_isp_process_overflow_irq(
 	struct vfe_device *vfe_dev,
 	uint32_t *irq_status0, uint32_t *irq_status1)
@@ -1125,8 +1122,7 @@ static inline void msm_isp_process_overflow_recovery(
 		break;
 	}
 }
-#endif
-
+/*QCT patch 20140627 E add*/
 irqreturn_t msm_isp_process_irq(int irq_num, void *data)
 {
 	unsigned long flags;
@@ -1137,10 +1133,10 @@ irqreturn_t msm_isp_process_irq(int irq_num, void *data)
 
 	vfe_dev->hw_info->vfe_ops.irq_ops.
 		read_irq_status(vfe_dev, &irq_status0, &irq_status1);
-#ifdef CONFIG_MACH_SONY_EAGLE
+	/*QCT patch 20140627 S add*/
 	msm_isp_process_overflow_irq(vfe_dev,
 		&irq_status0, &irq_status1);
-#endif
+	/*QCT patch 20140627 E add*/
 	vfe_dev->hw_info->vfe_ops.core_ops.
 		get_error_mask(&error_mask0, &error_mask1);
 	error_mask0 &= irq_status0;
@@ -1205,7 +1201,7 @@ void msm_isp_do_tasklet(unsigned long data)
 		irq_status1 = queue_cmd->vfeInterruptStatus1;
 		ts = queue_cmd->ts;
 		spin_unlock_irqrestore(&vfe_dev->tasklet_lock, flags);
-#ifdef CONFIG_MACH_SONY_EAGLE
+		/*QCT patch 20140627 S add*/
 		if (atomic_read(&vfe_dev->error_info.overflow_state) !=
 			NO_OVERFLOW) {
 			pr_err("There is overflow, kickup recovery!!!!");
@@ -1213,7 +1209,7 @@ void msm_isp_do_tasklet(unsigned long data)
 				irq_status0, irq_status1);
 			continue;
 		}
-#endif
+		/*QCT patch 20140627 E add*/
 		ISP_DBG("%s: status0: 0x%x status1: 0x%x\n",
 			__func__, irq_status0, irq_status1);
 		irq_ops->process_reset_irq(vfe_dev,
@@ -1264,14 +1260,13 @@ int msm_isp_open_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 		return -EBUSY;
 	}
 
-#ifndef CONFIG_MACH_SONY_EAGLE
-	rc = vfe_dev->hw_info->vfe_ops.core_ops.reset_hw(vfe_dev, ISP_RST_HARD);
-#else
+//	rc = vfe_dev->hw_info->vfe_ops.core_ops.reset_hw(vfe_dev, ISP_RST_HARD);/*QCT patch 20140627 delete*/
+	/*QCT patch 20140627 S add*/
 	memset(&vfe_dev->error_info, 0, sizeof(vfe_dev->error_info));
 	atomic_set(&vfe_dev->error_info.overflow_state, NO_OVERFLOW);
 
 	rc = vfe_dev->hw_info->vfe_ops.core_ops.reset_hw(vfe_dev, ISP_RST_HARD, 1);
-#endif
+	/*QCT patch 20140627 E add*/
 	if (rc <= 0) {
 		pr_err("%s: reset timeout\n", __func__);
 		mutex_unlock(&vfe_dev->core_mutex);
@@ -1297,9 +1292,7 @@ int msm_isp_open_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 	memset(&vfe_dev->axi_data, 0, sizeof(struct msm_vfe_axi_shared_data));
 	memset(&vfe_dev->stats_data, 0,
 		sizeof(struct msm_vfe_stats_shared_data));
-#ifndef CONFIG_MACH_SONY_EAGLE
-	memset(&vfe_dev->error_info, 0, sizeof(vfe_dev->error_info));
-#endif
+//	memset(&vfe_dev->error_info, 0, sizeof(vfe_dev->error_info));/*QCT patch 20140627 delete*/
 	vfe_dev->axi_data.hw_info = vfe_dev->hw_info->axi_hw_info;
 	vfe_dev->vfe_open_cnt++;
 	vfe_dev->taskletq_idx = 0;
@@ -1325,9 +1318,7 @@ int msm_isp_close_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 		return -ENODEV;
 	}
 
-#ifdef CONFIG_MACH_SONY_EAGLE
-	rc = vfe_dev->hw_info->vfe_ops.axi_ops.halt(vfe_dev, 1);
-#endif
+	rc = vfe_dev->hw_info->vfe_ops.axi_ops.halt(vfe_dev, 1);/*QCT patch 20140627 modify*/
 	if (rc <= 0)
 		pr_err("%s: halt timeout rc=%ld\n", __func__, rc);
 

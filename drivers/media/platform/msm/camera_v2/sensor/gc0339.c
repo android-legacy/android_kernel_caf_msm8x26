@@ -26,13 +26,17 @@ DEFINE_MSM_MUTEX(gc0339_mut);
 #else
 #define CDBG(fmt, args...) do { } while (0)
 #endif
+/**/
+#define CCI_camera
+/**/
 static struct msm_sensor_ctrl_t gc0339_s_ctrl;
-#ifdef CONFIG_MACH_SONY_EAGLE
+/**/
 static struct msm_sensor_ctrl_t gc0339_power_on;
 static struct msm_sensor_ctrl_t gc0339_power_off;
+/**/
+/**/
 int checksubcam_ID = 0;
-#endif
-
+/**/
 static struct msm_sensor_power_setting gc0339_power_setting[] = {
 
 	{
@@ -85,7 +89,6 @@ static struct msm_sensor_power_setting gc0339_power_setting[] = {
 	},
 };
 
-#ifdef CONFIG_MACH_SONY_EAGLE
 /*[VY52] VinceT, [Bug#171], S, Sub camera Dual power squence*/
 static struct msm_sensor_power_setting gc0339_power_on_setting[] = {
 		{//1.PDN "L"
@@ -131,7 +134,8 @@ static struct msm_sensor_power_setting gc0339_power_on_setting[] = {
 			.delay = 1,
 		},
 };
-
+/*[VY52] VinceT, [Bug#171], E, Sub camera Dual power squence*/
+/*[VY52] VinceT, [Bug#171], S, Sub camera Dual power squence*/
 static struct msm_sensor_power_setting gc0339_power_off_setting[] = {
 		{//8. MCLK
 			.seq_type = SENSOR_CLK,
@@ -182,8 +186,7 @@ static struct msm_sensor_power_setting gc0339_power_off_setting[] = {
 			.delay = 0,
 		},
 };
-#endif
-
+/*[VY52] VinceT, [Bug#171], E, Sub camera Dual power squence*/
 static struct v4l2_subdev_info gc0339_subdev_info[] = {
 	{
 		.code   = V4L2_MBUS_FMT_SBGGR10_1X10,
@@ -224,11 +227,13 @@ int32_t gc0339_power_up(struct msm_sensor_ctrl_t *s_ctrl)
 	struct msm_camera_sensor_board_info *data = s_ctrl->sensordata;
 
 	CDBG("%s:%d\n", __func__, __LINE__);
-#ifdef CONFIG_MACH_SONY_EAGLE
+/*[VY52] VinceT, [Bug#171], S, Sub camera Dual power squence*/
+#ifdef CCI_camera
 	power_setting_array = &gc0339_power_on.power_setting_array;
-#else
+#else//ORG
 	power_setting_array = &s_ctrl->power_setting_array;
 #endif
+/*[VY52] VinceT, [Bug#171], E, Sub camera Dual power squence*/
 	if (data->gpio_conf->cam_gpiomux_conf_tbl != NULL) {
 		pr_err("%s:%d mux install\n", __func__, __LINE__);
 		msm_gpiomux_install(
@@ -393,34 +398,40 @@ power_up_failed:
 int32_t gc0339_power_down(struct msm_sensor_ctrl_t *s_ctrl)
 {
 	int32_t index = 0;
-
+        
 	int32_t gpiotestnum = 0;
 	struct msm_sensor_power_setting_array *power_setting_array = NULL;
 	struct msm_sensor_power_setting *power_setting = NULL;
 	struct msm_camera_sensor_board_info *data = s_ctrl->sensordata;
 
 	CDBG("%s:%d\n", __func__, __LINE__);
-#ifdef CONFIG_MACH_SONY_EAGLE
+/*[VY52] VinceT, [Bug#171], S, Sub camera Dual power squence*/
+#ifdef CCI_camera
 	power_setting_array = &gc0339_power_off.power_setting_array;
-#else
+#else//ORG
 	power_setting_array = &s_ctrl->power_setting_array;
 #endif
-#ifdef CONFIG_MACH_SONY_EAGLE
+/*[VY52] VinceT, [Bug#171], E, Sub camera Dual power squence*/
+/*[VY52] VinceT, [Bug#440], S, change code-flow for QCT new version driver(move)*/
+#ifdef CCI_camera
 	s_ctrl->sensor_i2c_client->i2c_func_tbl->i2c_write(
 		s_ctrl->sensor_i2c_client,
 		0xfc,
 		0x01, MSM_CAMERA_I2C_BYTE_DATA);
 #endif
+/*[VY52] VinceT, [Bug#440], E, change code-flow for QCT new version driver(move)*/
 	if (s_ctrl->sensor_device_type == MSM_CAMERA_PLATFORM_DEVICE) {
 		s_ctrl->sensor_i2c_client->i2c_func_tbl->i2c_util(
 			s_ctrl->sensor_i2c_client, MSM_CCI_RELEASE);
 	}
-#ifndef CONFIG_MACH_SONY_EAGLE
+/*[VY52] VinceT, [Bug#440], S, change code-flow for QCT new version driver(remove)*/
+#ifndef CCI_camera
 	s_ctrl->sensor_i2c_client->i2c_func_tbl->i2c_write(
 		s_ctrl->sensor_i2c_client,
 		0xfc,
 		0x01, MSM_CAMERA_I2C_BYTE_DATA);
 #endif
+/*[VY52] VinceT, [Bug#440], E, change code-flow for QCT new version driver(remove)*/
 
 	for (index = (power_setting_array->size - 1); index >= 0; index--) {
 		CDBG("%s index %d\n", __func__, index);
@@ -428,12 +439,13 @@ int32_t gc0339_power_down(struct msm_sensor_ctrl_t *s_ctrl)
 		CDBG("%s type %d\n", __func__, power_setting->seq_type);
 		switch (power_setting->seq_type) {
 		case SENSOR_CLK:
-#ifdef CONFIG_MACH_SONY_EAGLE
+/*[VY5x] VinceT, [Bug#700], S, MCLK disable fixed*/
+#ifdef CCI_camera
 			msm_cam_clk_enable(s_ctrl->dev,
 				&s_ctrl->clk_info[0],
-				(struct clk **)&gc0339_power_on.power_setting_array.power_setting[index+1].data[0],
+				(struct clk **)&gc0339_power_on.power_setting_array.power_setting[index+1].data[0], // match data[0]
 				s_ctrl->clk_info_size,
-				0);
+				0);	
 #else
 			msm_cam_clk_enable(s_ctrl->dev,
 				&s_ctrl->clk_info[0],
@@ -441,6 +453,7 @@ int32_t gc0339_power_down(struct msm_sensor_ctrl_t *s_ctrl)
 				s_ctrl->clk_info_size,
 				0);
 #endif
+/*[VY5x] VinceT, [Bug#700], E, MCLK disable fixed*/
 			break;
 		case SENSOR_GPIO:
 			if (power_setting->seq_val >= SENSOR_GPIO_MAX ||
@@ -450,28 +463,22 @@ int32_t gc0339_power_down(struct msm_sensor_ctrl_t *s_ctrl)
 					SENSOR_GPIO_MAX);
 				continue;
 			}
-#ifdef CONFIG_MACH_SONY_EAGLE
+                        
 			gpiotestnum = data->gpio_conf->gpio_num_info->gpio_num
 					[power_setting->seq_val];
-#endif
 			if (data->gpio_conf->gpio_num_info->gpio_num
-				[power_setting->seq_val])
-#ifdef CONFIG_MACH_SONY_EAGLE
-				{
+				[power_setting->seq_val]){
 				if((gpiotestnum == 69) && (gpio69_count == 2)){
 					pr_err("[VY5X][CTS]Avoid main camera preview fail in CTS\n");
 				}
 				else {
-#endif
 				gpio_set_value_cansleep(
 					data->gpio_conf->gpio_num_info->gpio_num
 					[power_setting->seq_val],
 					GPIOF_OUT_INIT_LOW);
-#ifdef CONFIG_MACH_SONY_EAGLE
 				}
-
+                        
 			}
-#endif
 			break;
 		case SENSOR_VREG:
 			if (power_setting->seq_val >= CAM_VREG_MAX) {
@@ -480,7 +487,9 @@ int32_t gc0339_power_down(struct msm_sensor_ctrl_t *s_ctrl)
 					SENSOR_GPIO_MAX);
 				continue;
 			}
-#ifdef CONFIG_MACH_SONY_EAGLE
+			//CDBG("[Vince Debug][-disable time-][VREG:%s]\t%s type %d\n",data->cam_vreg[power_setting->seq_val].reg_name, __func__, power_setting->seq_type);//add todo: removeit
+/*[VY52] VinceT, [Bug#171], S, Sub camera Dual power squence*/
+#ifdef CCI_camera
 			msm_camera_config_single_vreg(s_ctrl->dev,
 				&data->cam_vreg[power_setting->seq_val],
 				(struct regulator **)&gc0339_power_on.power_setting_array.power_setting[index].data[0],
@@ -493,6 +502,7 @@ int32_t gc0339_power_down(struct msm_sensor_ctrl_t *s_ctrl)
 				0);
 			break;
 #endif
+/*[VY52] VinceT, [Bug#171], S, Sub camera Dual power squence*/
 		default:
 			pr_err("%s error power seq type %d\n", __func__,
 				power_setting->seq_type);
@@ -516,11 +526,10 @@ int32_t gc0339_match_id(struct msm_sensor_ctrl_t *s_ctrl)
 {
 	int32_t rc = 0;
 	uint16_t chipid = 0;
-#ifdef CONFIG_MACH_SONY_EAGLE
+	/**/
 	uint16_t camID_GPIO = 115;
 	int32_t subcamID = 1;
 	int ret1=0;
-#endif
 
 	rc = s_ctrl->sensor_i2c_client->i2c_func_tbl->i2c_read(
 			s_ctrl->sensor_i2c_client,
@@ -532,7 +541,7 @@ int32_t gc0339_match_id(struct msm_sensor_ctrl_t *s_ctrl)
 		return rc;
 	}
 
-#ifdef CONFIG_MACH_SONY_EAGLE
+	/**/
 	if(checksubcam_ID == 0) {
 	if(strcmp("SKUAA_ST_gc0339",s_ctrl->sensordata->sensor_name)==0) {
 		ret1 = gpio_request(camID_GPIO, NULL);
@@ -560,8 +569,8 @@ int32_t gc0339_match_id(struct msm_sensor_ctrl_t *s_ctrl)
 	}
 		checksubcam_ID = checksubcam_ID+1;
 	}
-#endif
-
+	/**/
+	
 	if (chipid != s_ctrl->sensordata->slave_info->sensor_id) {
 		pr_err("msm_sensor_match_id chip id doesnot match\n");
 		return -ENODEV;
@@ -820,7 +829,7 @@ static struct msm_sensor_ctrl_t gc0339_s_ctrl = {
 	.sensor_v4l2_subdev_info_size = ARRAY_SIZE(gc0339_subdev_info),
 	.func_tbl = &gc0339_sensor_fn_t,
 };
-#ifdef CONFIG_MACH_SONY_EAGLE
+/*[VY52] VinceT, [Bug#171], S, Sub camera Dual power squence*/
 static struct msm_sensor_ctrl_t gc0339_power_on =
 {
 	.power_setting_array.power_setting = gc0339_power_on_setting,
@@ -831,8 +840,7 @@ static struct msm_sensor_ctrl_t gc0339_power_off =
 	.power_setting_array.power_setting = gc0339_power_off_setting,
 	.power_setting_array.size = ARRAY_SIZE(gc0339_power_off_setting),
 };
-#endif
-
+/*[VY52] VinceT, [Bug#171], E, Sub camera Dual power squence*/
 static const struct of_device_id gc0339_dt_match[] = {
 	{.compatible = "shinetech,gc0339", .data = &gc0339_s_ctrl},
 	{}

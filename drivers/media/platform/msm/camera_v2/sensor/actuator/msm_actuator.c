@@ -26,11 +26,7 @@ DEFINE_MSM_MUTEX(msm_actuator_mutex);
 #else
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
 #endif
-
-#ifdef CONFIG_MACH_SONY_FLAMINGO
-// [Flamingo] Modify for Camera Second source
-extern uint16_t s5k5e2_version;
-#endif
+#define CCI_camera
 
 static struct msm_actuator msm_vcm_actuator_table;
 static struct msm_actuator msm_piezo_actuator_table;
@@ -114,11 +110,13 @@ static void msm_actuator_parse_i2c_params(struct msm_actuator_ctrl_t *a_ctrl,
 					i2c_byte2 = (value & 0xFF00) >> 8;
 				}
 			} else {
-#ifdef CONFIG_MACH_SONY_EAGLE
-					i2c_byte1 = ((value & 0x0300) >> 8) | 0xF4;
-#else
+/**/
+				#ifdef CCI_camera
+					i2c_byte1 = ((value & 0x0300) >> 8) | 0xF4; // [1111] => PS=1 EN=1 Mode =110 ; [01xx] Point Mode =110(con.)  Mode =1 
+				#else
 					i2c_byte1 = (value & 0xFF00) >> 8;
-#endif
+				#endif// ORG
+/**/
 				i2c_byte2 = value & 0xFF;
 			}
 		} else {
@@ -621,12 +619,6 @@ static int32_t msm_actuator_config(struct msm_actuator_ctrl_t *a_ctrl,
 	case CFG_GET_ACTUATOR_INFO:
 		cdata->is_af_supported = 1;
 		cdata->cfg.cam_name = a_ctrl->cam_name;
-#ifdef CONFIG_MACH_SONY_FLAMINGO
-// [Flamingo] Modify for Camera Second source
-		if(s5k5e2_version == 0x16)
-			cdata->cfg.cam_name = a_ctrl->cam_name = 6;
-		pr_info("msm_actuator_config: camera name = %d , id = %d\n",cdata->cfg.cam_name,a_ctrl->cam_name);
-#endif
 		break;
 
 	case CFG_SET_ACTUATOR_INFO:
@@ -726,25 +718,23 @@ static int msm_actuator_close(struct v4l2_subdev *sd,
 	struct v4l2_subdev_fh *fh) {
 	int rc = 0;
 	struct msm_actuator_ctrl_t *a_ctrl =  v4l2_get_subdevdata(sd);
-#ifdef CONFIG_MACH_SONY_EAGLE
-    int rc2 = 0;
-#endif
+    int rc2 = 0;	/**/
 	CDBG("Enter\n");
 	if (!a_ctrl) {
 		pr_err("failed\n");
 		return -EINVAL;
 	}
-#ifdef CONFIG_MACH_SONY_EAGLE
+	/**/
 	CDBG("back to DAC 0x0000!\n");
 	rc2 = a_ctrl->i2c_client.i2c_func_tbl->i2c_write(
 		&a_ctrl->i2c_client,
-		0x00,
-		0x00,
+		0x00, //addr
+		0x00, //data
 		MSM_CAMERA_I2C_BYTE_DATA);
 	if (rc2 < 0) {
 		pr_err("i2c write error:%d\n", rc);
 	}
-#endif
+	/**/
 	if (a_ctrl->act_device_type == MSM_CAMERA_PLATFORM_DEVICE) {
 		rc = a_ctrl->i2c_client.i2c_func_tbl->i2c_util(
 			&a_ctrl->i2c_client, MSM_CCI_RELEASE);

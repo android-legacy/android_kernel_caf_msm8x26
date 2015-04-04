@@ -20,14 +20,7 @@
 #include <mach/rpm-regulator-smd.h>
 #include <linux/regulator/consumer.h>
 
-#ifdef CONFIG_MACH_SONY_FLAMINGO
-// [Flamingo] Modify for Camera Second source
-uint16_t s5k5e2_version = 0;
-int powerup_count = 0;
-#endif
-#ifdef CONFIG_MACH_SONY_EAGLE
 #include "eeprom/msm_eeprom.h"
-#endif
 
 #undef CDBG
 #ifdef CONFIG_MSMB_CAMERA_DEBUG
@@ -35,15 +28,9 @@ int powerup_count = 0;
 #else
 #define CDBG(fmt, args...) do { } while (0)
 #endif
-
-#ifdef CONFIG_MACH_SONY_FLAMINGO
-// [Flamingo] Modify for Camera Second source
-static struct msm_camera_i2c_reg_conf s5k5e2_read_eeprom[] = {
-	{0x0A00 ,0x04},
-	{0x0A02 ,0x02},
-	{0x0A00 ,0x01},
-};
-#endif
+/**/
+#define CCI_camera
+/**/
 
 static int32_t msm_sensor_enable_i2c_mux(struct msm_camera_i2c_conf *i2c_conf)
 {
@@ -751,12 +738,12 @@ static int32_t msm_sensor_get_dt_data(struct device_node *of_node,
 		pr_err("%s failed %d\n", __func__, __LINE__);
 		goto ERROR1;
 	}
-#ifdef CONFIG_MACH_SONY_EAGLE
+	/**/
 	if(strcmp("imx134",s_ctrl->sensordata->sensor_name)==0) {
 		CDBG("%s:Main camera source no. is : %d\n", __func__,
 			cci_camera_source);
 		if(cci_camera_source == 1) {
-			s_ctrl->sensordata->sensor_name = "imx134_Sony";
+			s_ctrl->sensordata->sensor_name = "imx134_Sony";/*Bug1647,Guanyi,QC patch0118*/
 			CDBG("This is original source camera module-SONY\n");
 		}
 		else if(cci_camera_source == 2) {
@@ -769,7 +756,7 @@ static int32_t msm_sensor_get_dt_data(struct device_node *of_node,
 	}
 	pr_err("%s:[Mark] sensor-name: %s\n", __func__,
 			s_ctrl->sensordata->sensor_name);
-#endif
+	/**/
 
 	rc = of_property_read_u32(of_node, "qcom,sensor-mode",
 		&sensordata->sensor_init_params->modes_supported);
@@ -1007,11 +994,6 @@ int32_t msm_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl)
 	uint32_t retry = 0;
 	s_ctrl->stop_setting_valid = 0;
 
-#ifdef CONFIG_MACH_SONY_FLAMINGO
-// [Flamingo] Fixed Camera CTS issue:testMultiCameraRelease
-	powerup_count ++;
-#endif
-
 	CDBG("%s:%d\n", __func__, __LINE__);
 	power_setting_array = &s_ctrl->power_setting_array;
 
@@ -1132,10 +1114,6 @@ int32_t msm_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl)
 	CDBG("%s exit\n", __func__);
 	return 0;
 power_up_failed:
-#ifdef CONFIG_MACH_SONY_FLAMINGO
-// [Flamingo] Fixed Camera CTS issue:testMultiCameraRelease
-	powerup_count --;
-#endif
 	pr_err("%s:%d failed\n", __func__, __LINE__);
 	if (s_ctrl->sensor_device_type == MSM_CAMERA_PLATFORM_DEVICE) {
 		s_ctrl->sensor_i2c_client->i2c_func_tbl->i2c_util(
@@ -1190,22 +1168,12 @@ power_up_failed:
 int32_t msm_sensor_power_down(struct msm_sensor_ctrl_t *s_ctrl)
 {
 	int32_t index = 0;
-#ifdef CONFIG_MACH_SONY_EAGLE
+        
 	int32_t gpiotestnum = 0;
-#endif
 	struct msm_sensor_power_setting_array *power_setting_array = NULL;
 	struct msm_sensor_power_setting *power_setting = NULL;
 	struct msm_camera_sensor_board_info *data = s_ctrl->sensordata;
 	s_ctrl->stop_setting_valid = 0;
-
-#ifdef CONFIG_MACH_SONY_FLAMINGO
-// [Flamingo] Fixed Camera CTS issue:testMultiCameraRelease
-	if(powerup_count >1){
-		powerup_count--;
-		pr_info("msm_sensor_power_down: Can not power down!Ohter Camera still work!");
-		return 0;
-	}
-#endif
 
 	CDBG("%s:%d\n", __func__, __LINE__);
 	power_setting_array = &s_ctrl->power_setting_array;
@@ -1235,20 +1203,18 @@ int32_t msm_sensor_power_down(struct msm_sensor_ctrl_t *s_ctrl)
 					SENSOR_GPIO_MAX);
 				continue;
 			}
-#ifdef CONFIG_MACH_SONY_EAGLE
+                        
 			gpiotestnum = data->gpio_conf->gpio_num_info->gpio_num
 					[power_setting->seq_val];
 			if((gpiotestnum == 69) && (gpio69_count == 2)){
 				CDBG("[VY5X][CTS]Avoid sub camera preview fail in CTS\n");
 			}
 			else {
-#endif
 			gpio_set_value_cansleep(
 				data->gpio_conf->gpio_num_info->gpio_num
 				[power_setting->seq_val], GPIOF_OUT_INIT_LOW);
-#ifdef CONFIG_MACH_SONY_EAGLE
 			}
-#endif
+                        
 			break;
 		case SENSOR_VREG:
 			if (power_setting->seq_val >= CAM_VREG_MAX) {
@@ -1281,11 +1247,6 @@ int32_t msm_sensor_power_down(struct msm_sensor_ctrl_t *s_ctrl)
 	msm_camera_request_gpio_table(
 		data->gpio_conf->cam_gpio_req_tbl,
 		data->gpio_conf->cam_gpio_req_tbl_size, 0);
-#ifdef CONFIG_MACH_SONY_FLAMINGO
-// [Flamingo] Fixed Camera CTS issue:testMultiCameraRelease
-	powerup_count = 0;
-#endif
-
 	CDBG("%s exit\n", __func__);
 	return 0;
 }
@@ -1376,16 +1337,9 @@ int32_t msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl,
 		s_ctrl->sensordata->sensor_name, cdata->cfgtype);
 	switch (cdata->cfgtype) {
 	case CFG_GET_SENSOR_INFO:
-#ifdef CONFIG_MACH_SONY_FLAMINGO
-//[Flamingo] Modify for Camera Second source
-		memcpy(cdata->cfg.sensor_info.sensor_name,
-			s_ctrl->sensordata->sensor_info->sensor_name,
-			sizeof(cdata->cfg.sensor_info.sensor_name));
-#else
 		memcpy(cdata->cfg.sensor_info.sensor_name,
 			s_ctrl->sensordata->sensor_name,
 			sizeof(cdata->cfg.sensor_info.sensor_name));
-#endif
 		cdata->cfg.sensor_info.session_id =
 			s_ctrl->sensordata->sensor_info->session_id;
 		for (i = 0; i < SUB_MODULE_MAX; i++)
@@ -1880,8 +1834,7 @@ static struct msm_camera_i2c_fn_t msm_sensor_qup_func_tbl = {
 		msm_camera_qup_i2c_write_table_w_microdelay,
 	.i2c_write_conf_tbl = msm_camera_qup_i2c_write_conf_tbl,
 };
-
-#ifdef CONFIG_MACH_SONY_EAGLE
+/**/
 static ssize_t CheckCameraID_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
   uint16_t rc;
@@ -1935,7 +1888,7 @@ static ssize_t CheckCameraID_show(struct device *dev, struct device_attribute *a
   return sprintf(buf, "ID: 0x%x\n", chipid);
 }
 static DEVICE_ATTR(CheckCameraID, S_IRUSR | S_IWUSR, CheckCameraID_show, NULL);
-#endif
+/**/
 
 int32_t msm_sensor_platform_probe(struct platform_device *pdev, void *data)
 {
@@ -1997,41 +1950,6 @@ int32_t msm_sensor_platform_probe(struct platform_device *pdev, void *data)
 		return rc;
 	}
 
-#ifdef CONFIG_MACH_SONY_FLAMINGO
-//[Flamingo] Modify for Camera Second source
-	rc = strcmp(s_ctrl->sensordata->sensor_name,"s5k5e2");
-	if (rc == 0) {
-		rc = s_ctrl->sensor_i2c_client->i2c_func_tbl->i2c_write_conf_tbl(
-							s_ctrl->sensor_i2c_client,
-							s5k5e2_read_eeprom,
-							ARRAY_SIZE(s5k5e2_read_eeprom), MSM_CAMERA_I2C_BYTE_DATA);
-		msleep(5);
-		rc = s_ctrl->sensor_i2c_client->i2c_func_tbl->i2c_read(
-					s_ctrl->sensor_i2c_client,
-					0x0A06,
-					&s5k5e2_version, MSM_CAMERA_I2C_BYTE_DATA);
-		pr_err("%s: camera s5k5e2_version = 0x%x\n", __func__,s5k5e2_version);
-	}
-	v4l2_subdev_init(&s_ctrl->msm_sd.sd,
-		s_ctrl->sensor_v4l2_subdev_ops);
-	if (s5k5e2_version == 0x16) {
-		snprintf(s_ctrl->msm_sd.sd.name,
-			sizeof(s_ctrl->msm_sd.sd.name), "%s",
-			s_ctrl->sensordata->sensor_name);
-		snprintf(s_ctrl->sensordata->sensor_info->sensor_name,
-			sizeof(s_ctrl->sensordata->sensor_info->sensor_name), "%s_chicony",
-			s_ctrl->sensordata->sensor_name);
-	} else {
-		snprintf(s_ctrl->msm_sd.sd.name,
-			sizeof(s_ctrl->msm_sd.sd.name), "%s",
-			s_ctrl->sensordata->sensor_name);
-		snprintf(s_ctrl->sensordata->sensor_info->sensor_name,
-			sizeof(s_ctrl->sensordata->sensor_info->sensor_name), "%s",
-			s_ctrl->sensordata->sensor_name);
-	}
-	pr_info("%s: %s probe succeeded\n", __func__,
-		s_ctrl->sensordata->sensor_info->sensor_name);
-#else
 	CDBG("%s %s probe succeeded\n", __func__,
 		s_ctrl->sensordata->sensor_name);
 	v4l2_subdev_init(&s_ctrl->msm_sd.sd,
@@ -2039,7 +1957,6 @@ int32_t msm_sensor_platform_probe(struct platform_device *pdev, void *data)
 	snprintf(s_ctrl->msm_sd.sd.name,
 		sizeof(s_ctrl->msm_sd.sd.name), "%s",
 		s_ctrl->sensordata->sensor_name);
-#endif
 	v4l2_set_subdevdata(&s_ctrl->msm_sd.sd, pdev);
 	s_ctrl->msm_sd.sd.flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
 	media_entity_init(&s_ctrl->msm_sd.sd.entity, 0, NULL, 0);
@@ -2062,7 +1979,8 @@ int32_t msm_sensor_platform_probe(struct platform_device *pdev, void *data)
 
 	s_ctrl->func_tbl->sensor_power_down(s_ctrl);
 	CDBG("%s:%d\n", __func__, __LINE__);
-#ifdef CONFIG_MACH_SONY_EAGLE
+	/**/
+#ifdef CCI_camera
   CDBG("[Vince Debug] Pin Function create Function Enter\t%s:%d\n", __func__, __LINE__);
   {
       if(device_create_file(s_ctrl->dev, &dev_attr_CheckCameraID))
@@ -2071,6 +1989,7 @@ int32_t msm_sensor_platform_probe(struct platform_device *pdev, void *data)
       }
   }
 #endif
+		/**/
 	return rc;
 }
 
