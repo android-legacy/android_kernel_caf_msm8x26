@@ -944,29 +944,6 @@ static int estimate_ocv(struct qpnp_bms_chip *chip, int batt_temp)
 			ocv_est_uv, vbat_uv, ibat_ua, rbatt_mohm);
 	return ocv_est_uv;
 }
-#else
-#define DEFAULT_RBATT_SOC 50
-static int estimate_ocv(struct qpnp_bms_chip *chip, int batt_temp) 
-{
-	int ibat_ua, vbat_uv, ocv_est_uv, rbatt_mohm, rc;
-
-	rbatt_mohm = get_rbatt(chip, DEFAULT_RBATT_SOC, batt_temp);
-
-	rc = get_simultaneous_batt_v_and_i(chip, &ibat_ua, &vbat_uv);
-	if (rc) {
-		pr_err("simultaneous failed rc = %d\n", rc);
-		return rc;
-	}
-
-	ocv_est_uv = vbat_uv + (ibat_ua * rbatt_mohm) / 1000;
-
-	pr_debug("estimated pon ocv = %d, vbat_uv = %d ibat_ua = %d rbatt_mohm = %d\n",
-					ocv_est_uv, vbat_uv, ibat_ua, rbatt_mohm);
-	
-	return ocv_est_uv;
-	
-}
-#endif
 
 #define MIN_IAVG_MA 250
 static void reset_for_new_battery(struct qpnp_bms_chip *chip, int batt_temp)

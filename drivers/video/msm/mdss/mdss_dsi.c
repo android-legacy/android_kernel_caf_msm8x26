@@ -689,7 +689,6 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 	 */
 	if (mipi->lp11_init)
 		mdss_dsi_panel_reset(pdata, 1);
-  }
 
 	if (mipi->init_delay)
 		usleep(mipi->init_delay);
@@ -1044,8 +1043,6 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 	return rc;
 }
 
-//Joker marked
-/*
 static struct device_node *mdss_dsi_pref_prim_panel(
 		struct platform_device *pdev)
 {
@@ -1060,7 +1057,6 @@ static struct device_node *mdss_dsi_pref_prim_panel(
 
 	return dsi_pan_node;
 }
-*/
 
 /**
  * mdss_dsi_find_panel_of_node(): find device node of dsi panel
