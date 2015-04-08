@@ -2226,7 +2226,7 @@ static struct i2c_driver kionix_accel_driver = {
 	.id_table	= kionix_accel_id,
 };
 //[CCI]Ginger add for 2nd source driver
-extern uint8_t g_compass_product_id;
+uint8_t g_compass_product_id;
 static int __init kionix_accel_init(void)
 {
     printk("[CCI]kionix_accel_init: compass pid=0x%02x\n", g_compass_product_id);
