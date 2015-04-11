@@ -157,7 +157,8 @@
 	};
 
     qcom,camera@20 {
-		compatible = "sne,imx134";
+		cell-index = <0>;
+		compatible = "sne,imx134", "qcom,camera";
 		reg = <0x20>;
 		qcom,slave-id = <0x20 0x0016 0x0134>;
 		qcom,csiphy-sd-index = <0>;
@@ -199,7 +200,8 @@
 	};
 
     qcom,camera@42 {
-		compatible = "shinetech,gc0339";
+		cell-index = <1>;
+		compatible = "shinetech,gc0339", "qcom,camera";
 		reg = <0x42>;
 		qcom,slave-id = <0x42 0x0 0xc8>;
 		qcom,csiphy-sd-index = <1>;
