@@ -37,6 +37,7 @@
 #include <media/msmb_camera.h>
 #include <media/msmb_generic_buf_mgr.h>
 #include <media/msmb_pproc.h>
+#include <mach/clk-provider.h>
 #include "msm_cpp.h"
 #include "msm_isp_util.h"
 #include "msm_camera_io_util.h"
@@ -49,6 +50,7 @@
 #define CONFIG_MSM_CPP_DBG 0
 
 #define CPP_CMD_TIMEOUT_MS 300
+#define MSM_CPP_CORE_CLK_IDX 4
 #define MSM_MICRO_IFACE_CLK_IDX 7
 
 #define CPP_FW_VERSION_1_2_0	0x10020000
@@ -1435,6 +1437,13 @@ long msm_cpp_subdev_ioctl(struct v4l2_subdev *sd,
 		pr_err("cpp_dev is null\n");
 		return -EINVAL;
 	}
+
+	if ((ioctl_ptr->ioctl_ptr == NULL) || (ioctl_ptr->len == 0)){
+		pr_err("ioctl_ptr OR ioctl_ptr->len is NULL  %p %d \n",
+			ioctl_ptr, ioctl_ptr->len);
+		return -EINVAL;
+	}
+
 	mutex_lock(&cpp_dev->mutex);
 	CPP_DBG("E cmd: %d\n", cmd);
 	switch (cmd) {
@@ -1454,9 +1463,9 @@ long msm_cpp_subdev_ioctl(struct v4l2_subdev *sd,
 				kfree(cpp_dev->fw_name_bin);
 				cpp_dev->fw_name_bin = NULL;
 			}
-			if ((ioctl_ptr->len == 0) ||
-				(ioctl_ptr->len > MSM_CPP_MAX_FW_NAME_LEN)) {
-				pr_err("ioctl_ptr->len is 0\n");
+			if (ioctl_ptr->len >= MSM_CPP_MAX_FW_NAME_LEN) {
+				pr_err("Error: ioctl_ptr->len = %d \n",
+					 ioctl_ptr->len);
 				mutex_unlock(&cpp_dev->mutex);
 				return -EINVAL;
 			}
@@ -1469,7 +1478,9 @@ long msm_cpp_subdev_ioctl(struct v4l2_subdev *sd,
 				return -EINVAL;
 			}
 			if (ioctl_ptr->ioctl_ptr == NULL) {
-				pr_err("ioctl_ptr->ioctl_ptr=NULL\n");
+				pr_err("ioctl_ptr->ioctl_ptr is NULL\n");
+				kfree(cpp_dev->fw_name_bin);
+				cpp_dev->fw_name_bin = NULL;
 				mutex_unlock(&cpp_dev->mutex);
 				return -EINVAL;
 			}
@@ -1612,18 +1623,79 @@ long msm_cpp_subdev_ioctl(struct v4l2_subdev *sd,
 		struct msm_queue_cmd *event_qcmd;
 		struct msm_cpp_frame_info_t *process_frame;
 		event_qcmd = msm_dequeue(queue, list_eventdata);
-		process_frame = event_qcmd->command;
-		CPP_DBG("fid %d\n", process_frame->frame_id);
-		if (copy_to_user((void __user *)ioctl_ptr->ioctl_ptr,
-				process_frame,
-				sizeof(struct msm_cpp_frame_info_t))) {
-					mutex_unlock(&cpp_dev->mutex);
-					return -EINVAL;
+		if(event_qcmd) {
+			process_frame = event_qcmd->command;
+			CPP_DBG("fid %d\n", process_frame->frame_id);
+			if (copy_to_user((void __user *)ioctl_ptr->ioctl_ptr,
+					process_frame,
+					sizeof(struct msm_cpp_frame_info_t))) {
+						kfree(process_frame->cpp_cmd_msg);
+						process_frame->cpp_cmd_msg = NULL;
+						kfree(process_frame);
+						process_frame = NULL;
+						kfree(event_qcmd);
+						event_qcmd = NULL;
+						mutex_unlock(&cpp_dev->mutex);
+						return -EINVAL;
+			}
+
+			kfree(process_frame->cpp_cmd_msg);
+			kfree(process_frame);
+			kfree(event_qcmd);
+		} else {
+			pr_err("Empty command list\n");
+			return -EFAULT;
+		}
+		break;
+	}
+	case VIDIOC_MSM_CPP_SET_CLOCK: {
+		struct msm_cpp_clock_settings_t clock_settings;
+		unsigned long clock_rate = 0;
+		CPP_DBG("VIDIOC_MSM_CPP_SET_CLOCK\n");
+		if (ioctl_ptr->len == 0) {
+			pr_err("ioctl_ptr->len is 0\n");
+			mutex_unlock(&cpp_dev->mutex);
+			return -EINVAL;
 		}
 
-		kfree(process_frame->cpp_cmd_msg);
-		kfree(process_frame);
-		kfree(event_qcmd);
+		if (ioctl_ptr->ioctl_ptr == NULL) {
+			pr_err("ioctl_ptr->ioctl_ptr is NULL\n");
+			mutex_unlock(&cpp_dev->mutex);
+			return -EINVAL;
+		}
+
+		if (ioctl_ptr->len != sizeof(struct msm_cpp_clock_settings_t)) {
+			pr_err("Not valid ioctl_ptr->len\n");
+			mutex_unlock(&cpp_dev->mutex);
+			return -EINVAL;
+		}
+
+		rc = (copy_from_user(&clock_settings,
+			(void __user *)ioctl_ptr->ioctl_ptr,
+			ioctl_ptr->len) ? -EFAULT : 0);
+		if (rc) {
+			ERR_COPY_FROM_USER();
+			mutex_unlock(&cpp_dev->mutex);
+			return -EINVAL;
+		}
+		if (clock_settings.clock_rate > 0) {
+			rc = msm_isp_update_bandwidth(ISP_CPP,
+				clock_settings.avg,
+				clock_settings.inst);
+			if (rc < 0) {
+				pr_err("Bandwidth Set Failed!\n");
+				msm_isp_update_bandwidth(ISP_CPP, 0, 0);
+				mutex_unlock(&cpp_dev->mutex);
+				return -EINVAL;
+			}
+			clock_rate = clk_round_rate(
+				cpp_dev->cpp_clk[MSM_CPP_CORE_CLK_IDX],
+				clock_settings.clock_rate);
+			if (clock_rate != clock_settings.clock_rate)
+				pr_err("clock rate differ from settings\n");
+			clk_set_rate(cpp_dev->cpp_clk[MSM_CPP_CORE_CLK_IDX],
+				clock_rate);
+		}
 		break;
 	}
 	case MSM_SD_SHUTDOWN: {

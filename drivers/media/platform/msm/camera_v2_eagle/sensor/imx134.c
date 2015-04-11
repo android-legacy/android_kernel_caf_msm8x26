@@ -13,42 +13,42 @@
 #include "msm_sensor.h"
 #define IMX134_SENSOR_NAME "imx134"
 DEFINE_MSM_MUTEX(imx134_mut);
-#define OPTICAL
-//#define OPTICAL_DEBUG
 
 static struct msm_sensor_ctrl_t imx134_s_ctrl;
 
 static struct msm_sensor_power_setting imx134_power_setting[] = {
-	{/*1. I2C Pull-Up*/
+#ifdef CONFIG_MACH_SONY_EAGLE
+	{
 		.seq_type = SENSOR_VREG,
 		.seq_val = CAM_VIO, /*I2C-Pull-Up*/
 		.config_val = 0,
 		.delay = 0,
 	},
-	{/*2. VDIG*/
+#endif
+	{
 		.seq_type = SENSOR_VREG,
 		.seq_val = CAM_VDIG,
 		.config_val = 0,
 		.delay = 0,
 	},
-	{/*3. VANA*/
+	{
 		.seq_type = SENSOR_VREG,
 		.seq_val = CAM_VANA,
 		.config_val = 0,
 		.delay = 0,
 	},
-#if defined(OPTICAL)
-	{/*4. VIF*/
-			.seq_type = SENSOR_GPIO,
-			.seq_val = SENSOR_GPIO_VIO, /*VIF*/
-			.config_val = GPIO_OUT_LOW,
-			.delay = 0,
+#ifdef CONFIG_MACH_SONY_EAGLE
+	{
+		.seq_type = SENSOR_GPIO,
+		.seq_val = SENSOR_GPIO_VIO, /*VIF*/
+		.config_val = GPIO_OUT_LOW,
+		.delay = 0,
 	},
 	{
-			.seq_type = SENSOR_GPIO,
-			.seq_val = SENSOR_GPIO_VIO, /*VIF*/
-			.config_val = GPIO_OUT_HIGH,
-			.delay = 1,
+		.seq_type = SENSOR_GPIO,
+		.seq_val = SENSOR_GPIO_VIO, /*VIF*/
+		.config_val = GPIO_OUT_HIGH,
+		.delay = 1,
 	},
 #else
 	{
@@ -59,47 +59,77 @@ static struct msm_sensor_power_setting imx134_power_setting[] = {
 	},
 #endif
 
-#if defined(OPTICAL)
-	{/*5. MCLK*/
+#ifdef CONFIG_MACH_SONY_EAGLE
+	{
 		.seq_type = SENSOR_CLK,
 		.seq_val = SENSOR_CAM_MCLK,
 		.config_val = 24000000,
 		.delay = 1,
 	},
-#else//ORG
 #endif
-	{/*6. VAF*/
+	{
 		.seq_type = SENSOR_VREG,
 		.seq_val = CAM_VAF,
 		.config_val = 0,
 		.delay = 0,
 	},
-	{/*7. WP*/
+	{
 		.seq_type = SENSOR_GPIO,
+#ifdef CONFIG_MACH_SONY_EAGLE
 		.seq_val = SENSOR_GPIO_STANDBY,
+#else
+		.seq_val = SENSOR_GPIO_RESET,
+#endif
 		.config_val = GPIO_OUT_LOW,
+#ifdef CONFIG_MACH_SONY_EAGLE
 		.delay = 0,
+#else
+		.delay = 1,
+#endif
 	},
 	{
 		.seq_type = SENSOR_GPIO,
+#ifdef CONFIG_MACH_SONY_EAGLE
 		.seq_val = SENSOR_GPIO_STANDBY,
-		.config_val = GPIO_OUT_HIGH,
-		.delay = 0,
-	},
-	{/*8. Reset*/
-		.seq_type = SENSOR_GPIO,
+#else
 		.seq_val = SENSOR_GPIO_RESET,
-		.config_val = GPIO_OUT_LOW,
+#endif
+		.config_val = GPIO_OUT_HIGH,
+#ifdef CONFIG_MACH_SONY_EAGLE
 		.delay = 0,
+#else
+		.delay = 30,
+#endif
 	},
 	{
 		.seq_type = SENSOR_GPIO,
+#ifdef CONFIG_MACH_SONY_EAGLE
 		.seq_val = SENSOR_GPIO_RESET,
-		.config_val = GPIO_OUT_HIGH,
-		.delay = 1,//250,
+#else
+		.seq_val = SENSOR_GPIO_STANDBY,
+#endif
+		.config_val = GPIO_OUT_LOW,
+#ifdef CONFIG_MACH_SONY_EAGLE
+		.delay = 0,
+#else
+		.delay = 1,
+#endif
 	},
-#if defined(OPTICAL)
-#else//ORG
+	{
+		.seq_type = SENSOR_GPIO,
+#ifdef CONFIG_MACH_SONY_EAGLE
+		.seq_val = SENSOR_GPIO_RESET,
+#else
+		.seq_val = SENSOR_GPIO_STANDBY,
+#endif
+		.config_val = GPIO_OUT_HIGH,
+#ifdef CONFIG_MACH_SONY_EAGLE
+		.delay = 1,
+#else
+		.delay = 30,
+#endif
+	},
+#ifndef CONFIG_MACH_SONY_EAGLE
 	{
 		.seq_type = SENSOR_CLK,
 		.seq_val = SENSOR_CAM_MCLK,
@@ -148,7 +178,11 @@ static struct msm_camera_i2c_client imx134_sensor_i2c_client = {
 };
 
 static const struct of_device_id imx134_dt_match[] = {
+#ifdef CONFIG_MACH_SONY_EAGLE
 	{.compatible = "qcom,imx134", .data = &imx134_s_ctrl},
+#else
+	{.compatible = "sne,imx134", .data = &imx134_s_ctrl},
+#endif
 	{}
 };
 
@@ -156,7 +190,11 @@ MODULE_DEVICE_TABLE(of, imx134_dt_match);
 
 static struct platform_driver imx134_platform_driver = {
 	.driver = {
+#ifdef CONFIG_MACH_SONY_EAGLE
 		.name = "qcom,imx134",
+#else
+		.name = "sne,imx134",
+#endif
 		.owner = THIS_MODULE,
 		.of_match_table = imx134_dt_match,
 	},

@@ -110,6 +110,17 @@ void msm_camera_io_memcpy(void __iomem *dest_addr,
 	msm_camera_io_dump(dest_addr, len);
 }
 
+void msm_camera_io_memcpy_mb(void __iomem *dest_addr,
+	void __iomem *src_addr, u32 len)
+{
+	int i;
+	u32 *d = (u32 *) dest_addr;
+	u32 *s = (u32 *) src_addr;
+
+	for (i = 0; i < (len / 4); i++)
+		msm_camera_io_w_mb(*s++, d++);
+}
+
 int msm_cam_clk_sel_src(struct device *dev, struct msm_cam_clk_info *clk_info,
 		struct msm_cam_clk_info *clk_src_info, int num_clk)
 {
@@ -561,10 +572,12 @@ int msm_camera_request_gpio_table(struct gpio *gpio_tbl, uint8_t size,
 	if (gpio_en) {
 
 		for (i = 0; i < size; i++) {
+#ifdef CONFIG_MACH_SONY_EAGLE
 			if(gpio_tbl[i].gpio == 69) {
 				gpio69_count = gpio69_count + 1;
 				CDBG("[VY5X] GPIO69_count+1 = %d\n",gpio69_count);
 			}
+#endif
 			err = gpio_request_one(gpio_tbl[i].gpio,
 				gpio_tbl[i].flags, gpio_tbl[i].label);
 			if (err) {
@@ -579,12 +592,14 @@ int msm_camera_request_gpio_table(struct gpio *gpio_tbl, uint8_t size,
 			}
 		}
 	} else {
+#ifdef CONFIG_MACH_SONY_EAGLE
 		for (i = 0; i < size; i++) {
 			if(gpio_tbl[i].gpio == 69) {
 				gpio69_count = gpio69_count-1;
 				CDBG("[VY5X] GPIO69_count-1 = %d\n",gpio69_count);
 			}
 		}
+#endif
 
 		gpio_free_array(gpio_tbl, size);
 	}

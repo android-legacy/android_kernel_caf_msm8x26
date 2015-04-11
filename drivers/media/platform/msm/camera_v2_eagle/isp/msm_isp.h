@@ -19,7 +19,7 @@
 #include <linux/io.h>
 #include <linux/list.h>
 #include <linux/delay.h>
-#include <linux/avtimer.h>
+#include <linux/avtimer_kernel.h>
 #include <media/v4l2-subdev.h>
 #include <media/msmb_isp.h>
 #include <mach/msm_bus.h>
@@ -35,10 +35,6 @@
 #define MAX_NUM_STATS_COMP_MASK 2
 #define MAX_INIT_FRAME_DROP 31
 #define ISP_Q2 (1 << 2)
-
-#define AVTIMER_MSW_PHY_ADDR 0xFE05300C
-#define AVTIMER_LSW_PHY_ADDR 0xFE053008
-#define AVTIMER_ITERATION_CTR 16
 
 #define VFE_PING_FLAG 0xFFFFFFFF
 #define VFE_PONG_FLAG 0x0
@@ -68,8 +64,12 @@ enum msm_isp_camif_update_state {
 	NO_UPDATE,
 	ENABLE_CAMIF,
 	DISABLE_CAMIF,
+#ifndef CONFIG_MACH_SONY_EAGLE
+	DISABLE_CAMIF_IMMEDIATELY
+#else
 	DISABLE_CAMIF_IMMEDIATELY,
-	DISABLE_CAMIF_IMMEDIATELY_VFE_RECOVER /*QCT patch 20140627 Add*/
+	DISABLE_CAMIF_IMMEDIATELY_VFE_RECOVER
+#endif
 };
 
 enum msm_isp_reset_type {
@@ -149,13 +149,21 @@ struct msm_vfe_axi_ops {
 	uint32_t (*get_wm_mask) (uint32_t irq_status0, uint32_t irq_status1);
 	uint32_t (*get_comp_mask) (uint32_t irq_status0, uint32_t irq_status1);
 	uint32_t (*get_pingpong_status) (struct vfe_device *vfe_dev);
-	long (*halt) (struct vfe_device *vfe_dev, uint32_t blocking);/*QCT patch 20140627 modify*/
+#ifdef CONFIG_MACH_SONY_EAGLE
+	long (*halt) (struct vfe_device *vfe_dev, uint32_t blocking);
+#else
+	long (*halt) (struct vfe_device *vfe_dev);
+#endif
 };
 
 struct msm_vfe_core_ops {
 	void (*reg_update) (struct vfe_device *vfe_dev);
 	long (*reset_hw) (struct vfe_device *vfe_dev,
-			enum msm_isp_reset_type reset_type, uint32_t blocking);/*QCT patch 20140627 modify*/
+#ifdef CONFIG_MACH_SONY_EAGLE
+		enum msm_isp_reset_type reset_type, uint32_t blocking);
+#else
+		enum msm_isp_reset_type reset_type);
+#endif
 	int (*init_hw) (struct vfe_device *vfe_dev);
 	void (*init_hw_reg) (struct vfe_device *vfe_dev);
 	void (*release_hw) (struct vfe_device *vfe_dev);
@@ -168,13 +176,15 @@ struct msm_vfe_core_ops {
 		enum msm_vfe_input_src input_src);
 	int (*get_platform_data) (struct vfe_device *vfe_dev);
 	void (*get_error_mask) (uint32_t *error_mask0, uint32_t *error_mask1);
-	void (*process_error_status) (struct vfe_device *vfe_dev);/*QCT patch 20140627 add*/
-	void (*get_overflow_mask) (uint32_t *overflow_mask);/*QCT patch 20140627 add*/
+	void (*process_error_status) (struct vfe_device *vfe_dev);
+#ifdef CONFIG_MACH_SONY_EAGLE
+	void (*get_overflow_mask) (uint32_t *overflow_mask);
 	void (*get_irq_mask) (struct vfe_device *vfe_dev,
-		uint32_t *irq0_mask, uint32_t *irq1_mask);/*QCT patch 20140627 add*/
-	void (*restore_irq_mask) (struct vfe_device *vfe_dev);/*QCT patch 20140627 add*/
+		uint32_t *irq0_mask, uint32_t *irq1_mask);
+	void (*restore_irq_mask) (struct vfe_device *vfe_dev);
 	void (*get_halt_restart_mask) (uint32_t *irq0_mask,
-		uint32_t *irq1_mask);/*QCT patch 20140627 add*/
+		uint32_t *irq1_mask);
+#endif
 };
 struct msm_vfe_stats_ops {
 	int (*get_stats_idx) (enum msm_isp_stats_type stats_type);
@@ -286,7 +296,9 @@ struct msm_vfe_axi_stream {
 	enum msm_vfe_axi_stream_type stream_type;
 	uint32_t vt_enable;
 	uint32_t frame_based;
+#ifdef CONFIG_MACH_SONY_EAGLE
 	enum msm_vfe_frame_skip_pattern frame_skip_pattern; /*QCT patch 20140627 add*/
+#endif
 	uint32_t framedrop_period;
 	uint32_t framedrop_pattern;
 	uint32_t num_burst_capture;/*number of frame to capture*/
@@ -349,6 +361,7 @@ struct msm_vfe_axi_shared_data {
 	struct msm_vfe_src_info src_info[VFE_SRC_MAX];
 	uint16_t stream_handle_cnt;
 	unsigned long event_mask;
+	uint32_t burst_len;
 };
 
 struct msm_vfe_stats_hardware_info {
@@ -390,6 +403,8 @@ struct msm_vfe_stats_shared_data {
 	atomic_t stats_comp_mask;
 	uint16_t stream_handle_cnt;
 	atomic_t stats_update;
+	uint32_t stats_mask;
+	uint32_t stats_burst_len;
 };
 
 struct msm_vfe_tasklet_queue_cmd {
@@ -401,20 +416,21 @@ struct msm_vfe_tasklet_queue_cmd {
 };
 
 #define MSM_VFE_TASKLETQ_SIZE 200
-/*QCT patch S 20140627 add*/
+#ifdef CONFIG_MACH_SONY_EAGLE
 enum msm_vfe_overflow_state {
 	NO_OVERFLOW,
 	OVERFLOW_DETECTED,
 	HALT_REQUESTED,
 	RESTART_REQUESTED,
 };
-/*QCT patch E 20140627 add*/
+#endif
+
 struct msm_vfe_error_info {
-	/*QCT patch S 20140627 add*/
+#ifdef CONFIG_MACH_SONY_EAGLE
 	atomic_t overflow_state;
 	uint32_t overflow_recover_irq_mask0;
 	uint32_t overflow_recover_irq_mask1;
-	/*QCT patch E 20140627 add*/
+#endif
 	uint32_t error_mask0;
 	uint32_t error_mask1;
 	uint32_t violation_status;
@@ -459,8 +475,7 @@ struct vfe_device {
 	struct list_head tasklet_q;
 	struct tasklet_struct vfe_tasklet;
 	struct msm_vfe_tasklet_queue_cmd
-		tasklet_queue_cmd[MSM_VFE_TASKLETQ_SIZE];
-
+	tasklet_queue_cmd[MSM_VFE_TASKLETQ_SIZE];
 	uint32_t soc_hw_version;
 	uint32_t vfe_hw_version;
 	struct msm_vfe_hardware_info *hw_info;
@@ -472,9 +487,9 @@ struct vfe_device {
 	int vfe_clk_idx;
 	uint32_t vfe_open_cnt;
 	uint8_t vt_enable;
-	void __iomem *p_avtimer_msw;
-	void __iomem *p_avtimer_lsw;
 	uint8_t ignore_error;
+	struct msm_isp_statistics *stats;
+	uint32_t vfe_ub_size;
 };
 
 #endif

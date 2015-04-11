@@ -23,7 +23,9 @@
 #include "msm_camera_dt_util.h"
 
 
+#ifdef CONFIG_MACH_SONY_EAGLE
 extern int cci_camera_source;
+#endif
 
 struct msm_eeprom_ctrl_t;
 
