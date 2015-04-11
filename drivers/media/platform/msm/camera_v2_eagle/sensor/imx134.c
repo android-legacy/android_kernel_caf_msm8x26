@@ -178,11 +178,7 @@ static struct msm_camera_i2c_client imx134_sensor_i2c_client = {
 };
 
 static const struct of_device_id imx134_dt_match[] = {
-#ifdef CONFIG_MACH_SONY_EAGLE
-	{.compatible = "qcom,imx134", .data = &imx134_s_ctrl},
-#else
 	{.compatible = "sne,imx134", .data = &imx134_s_ctrl},
-#endif
 	{}
 };
 
@@ -190,11 +186,7 @@ MODULE_DEVICE_TABLE(of, imx134_dt_match);
 
 static struct platform_driver imx134_platform_driver = {
 	.driver = {
-#ifdef CONFIG_MACH_SONY_EAGLE
-		.name = "qcom,imx134",
-#else
 		.name = "sne,imx134",
-#endif
 		.owner = THIS_MODULE,
 		.of_match_table = imx134_dt_match,
 	},
